@@ -1,0 +1,7 @@
+export { FeatureToggles } from './plugin'
+export { default as Feature } from './components/Feature.vue'
+export { default as FeatureDevTools } from './components/FeatureDevTools.vue'
+export { vFeature } from './directives/vFeature'
+export { useFeature } from './composables/useFeature'
+export { useFeatureProvider } from './composables/useFeatureProvider'
+export type { FeatureTogglesOptions, FeatureProvider, FlagSource } from './core/types'
