@@ -1,14 +1,14 @@
 import { computed, inject } from 'vue'
 import type { Ref } from 'vue'
 import { FEATURE_PROVIDER_KEY } from '../core/FeatureProvider'
-import type { FeatureProvider } from '../core/types'
+import type { FeatureProvider, FlagName } from '../core/types'
 
-export function useFeature(name: string): Ref<boolean>
-export function useFeature<T extends string>(names: T[]): Record<T, Ref<boolean>>
-export function useFeature(first: string, ...rest: string[]): Ref<boolean>
+export function useFeature(name: FlagName): Ref<boolean>
+export function useFeature<T extends FlagName>(names: T[]): Record<T, Ref<boolean>>
+export function useFeature(first: FlagName, ...rest: FlagName[]): Ref<boolean>
 export function useFeature(
-  firstOrArray: string | string[],
-  ...rest: string[]
+  firstOrArray: FlagName | FlagName[],
+  ...rest: FlagName[]
 ): Ref<boolean> | Record<string, Ref<boolean>> {
   const provider = inject<FeatureProvider>(FEATURE_PROVIDER_KEY)
 
@@ -26,4 +26,10 @@ export function useFeature(
   }
 
   return computed(() => provider?.isEnabled(firstOrArray) ?? false)
+}
+
+/** Returns the current variant string for a multivariate flag. */
+export function useFeatureVariant(name: FlagName): Ref<string> {
+  const provider = inject<FeatureProvider>(FEATURE_PROVIDER_KEY)
+  return computed(() => provider?.getVariant(name) ?? '')
 }
