@@ -1,56 +1,57 @@
-<script lang="ts">
-import { defineComponent, inject, computed, h, Fragment, createTextVNode } from 'vue'
-import type { PropType, Component, VNode } from 'vue'
+<script setup lang="ts">
+import { inject, computed, useSlots } from 'vue'
+import type { Component } from 'vue'
 import { FEATURE_PROVIDER_KEY } from '../core/FeatureProvider'
 import type { FeatureProvider } from '../core/types'
 
-export default defineComponent({
-  name: 'Feature',
+const props = defineProps<{
+  name?: string
+  group?: string
+  fallback?: string | Component
+  inverted?: boolean
+  tag?: string
+}>()
 
-  props: {
-    name: { type: String, required: true },
-    fallback: { type: [String, Object] as PropType<string | Component>, default: null },
-    inverted: { type: Boolean, default: false },
-    tag: { type: String, default: undefined },
-  },
+const slots = useSlots()
+const provider = inject<FeatureProvider>(FEATURE_PROVIDER_KEY)
 
-  setup(props, { slots }) {
-    const provider = inject<FeatureProvider>(FEATURE_PROVIDER_KEY)
+const isLoading = computed(() => provider?.isLoading.value ?? false)
 
-    const isEnabled = computed(() => provider?.isEnabled(props.name) ?? false)
-    const shouldShow = computed(() => (props.inverted ? !isEnabled.value : isEnabled.value))
-    const isLoading = computed(() => provider?.isLoading.value ?? false)
-
-    const wrap = (nodes: VNode[]) => {
-      if (!nodes.length) return null
-      return props.tag ? h(props.tag, nodes) : h(Fragment, null, nodes)
-    }
-
-    return () => {
-      if (isLoading.value && slots.loading) {
-        return wrap(slots.loading())
-      }
-
-      if (shouldShow.value) {
-        return slots.default ? wrap(slots.default()) : null
-      }
-
-      if (slots.fallback) {
-        return wrap(slots.fallback())
-      }
-
-      if (typeof props.fallback === 'string' && props.fallback) {
-        const nodes = [createTextVNode(props.fallback)]
-        return props.tag ? h(props.tag, nodes) : h(Fragment, null, nodes)
-      }
-
-      if (props.fallback && typeof props.fallback === 'object') {
-        const nodes = [h(props.fallback as Component)]
-        return props.tag ? h(props.tag, nodes) : h(Fragment, null, nodes)
-      }
-
-      return null
-    }
-  },
+const shouldShow = computed(() => {
+  let enabled: boolean
+  if (props.group)     enabled = provider?.isGroupEnabled(props.group) ?? false
+  else if (props.name) enabled = provider?.isEnabled(props.name) ?? false
+  else                 enabled = false
+  return props.inverted ? !enabled : enabled
 })
+
+const fallbackComponent = computed(() =>
+  props.fallback && typeof props.fallback === 'object' ? (props.fallback as Component) : null,
+)
+const fallbackText = computed(() =>
+  typeof props.fallback === 'string' ? props.fallback : '',
+)
 </script>
+
+<template>
+  <!--
+    Two identical branches: one wrapped in the dynamic tag, one raw (Fragment).
+    The duplication is intentional — Vue templates can't conditionally omit a wrapper
+    without duplicating the inner content.
+  -->
+  <component :is="tag" v-if="tag">
+    <slot v-if="isLoading && slots.loading" name="loading" />
+    <slot v-else-if="shouldShow" />
+    <slot v-else-if="slots.fallback" name="fallback" />
+    <component v-else-if="fallbackComponent" :is="fallbackComponent" />
+    <template v-else-if="fallbackText">{{ fallbackText }}</template>
+  </component>
+
+  <template v-else>
+    <slot v-if="isLoading && slots.loading" name="loading" />
+    <slot v-else-if="shouldShow" />
+    <slot v-else-if="slots.fallback" name="fallback" />
+    <component v-else-if="fallbackComponent" :is="fallbackComponent" />
+    <template v-else-if="fallbackText">{{ fallbackText }}</template>
+  </template>
+</template>

@@ -6,10 +6,14 @@ export default defineConfig({
   plugins: [vue()],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: {
+        'vue-feature-toggles': resolve(__dirname, 'src/index.ts'),
+        'testing':   resolve(__dirname, 'src/testing.ts'),
+        'storybook': resolve(__dirname, 'src/storybook.ts'),
+      },
       name: 'VueFeatureToggles',
-      fileName: 'vue-feature-toggles',
       formats: ['es', 'cjs'],
+      fileName: (format, entryName) => `${entryName}.${format === 'es' ? 'js' : 'cjs'}`,
     },
     rollupOptions: {
       external: ['vue'],
