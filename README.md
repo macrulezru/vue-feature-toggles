@@ -806,15 +806,26 @@ Per-story `parameters.featureToggles` are merged on top of the global defaults. 
 npx vue-feature-toggles <command> [options]
 ```
 
-The CLI reads a `feature-toggles.config.js` (or `.mjs` / `.json`) file in the project root.
+The CLI reads configuration directly from your source files — no separate config file needed. It scans for `app.use(FeatureToggles, { ... })` and statically extracts `flags`, `meta`, `expiry`, `groups`, and `dependencies`.
 
-```js
-// feature-toggles.config.js
-export default {
-  flags:  { newDashboard: true, betaSearch: false },
+```ts
+// main.ts — the CLI reads this automatically
+app.use(FeatureToggles, {
+  flags:  { newDashboard: true, betaSearch: false, checkoutFlow: 'v1' },
   meta:   { newDashboard: { owner: 'alice', addedAt: '2024-01-15', ticket: 'PROJ-42' } },
   expiry: { betaBanner: '2025-06-01' },
   groups: { beta: ['betaSearch'] },
+  // rules, loader — dynamic, not parsed by CLI
+})
+```
+
+If you need an explicit override (e.g. in a monorepo), create `feature-toggles.config.js` in the project root — it takes priority over source scanning:
+
+```js
+// feature-toggles.config.js  (optional explicit override)
+export default {
+  flags:  { newDashboard: true, betaSearch: false },
+  meta:   { newDashboard: { owner: 'alice', addedAt: '2024-01-15' } },
 }
 ```
 
@@ -824,16 +835,32 @@ export default {
 npx vue-feature-toggles list
 ```
 
-Prints a table with current value, description, owner, ticket, expiry badge, and group membership.
+Prints an aligned table with flag name, value, source, owner, addedAt, expiry badge, and group membership.
+
+```
+Flag             Value  Source  Owner      Added       Expiry     Groups
+──────────────────────────────────────────────────────────────────────────
+newDashboard     true   static  frontend   2025-01-15             layout
+betaSearch       false  static  search-…   2025-06-01             beta
+checkoutFlow     v1     static  checkout   2025-09-01
+christmasBanner  true   static  marketing  2024-11-01  [EXPIRED]
+```
 
 #### `check` — find unknown flag references
 
 ```sh
 npx vue-feature-toggles check
+npx vue-feature-toggles check ./src/features
 npx vue-feature-toggles check --src src/features
 ```
 
-Scans `.ts`, `.tsx`, `.js`, `.jsx`, `.vue` files for `useFeature(...)`, `v-feature="..."`, `isEnabled(...)` calls. Reports any flag names not found in the config, with "did you mean?" suggestions. Exits with code 1 if unknown references are found — safe to use in CI.
+Scans `.ts`, `.tsx`, `.js`, `.jsx`, `.vue` files for `useFeature(...)`, `v-feature="..."`, `isEnabled(...)` calls. Lists each found reference — ✅ known, ❌ unknown with "did you mean?" suggestion. Exits with code 1 on unknown references — safe for CI.
+
+```
+✅ newDashboard
+✅ betaSearch
+❌ newCheckout  — unknown flag. Did you mean: checkoutFlow?
+```
 
 #### `stale` — find flags overdue for cleanup
 
@@ -842,13 +869,13 @@ npx vue-feature-toggles stale
 npx vue-feature-toggles stale --months 6
 ```
 
-Reports boolean `true` flags whose `meta.addedAt` is older than `--months` (default: 3).
+Reports boolean `true` flags whose `meta.addedAt` is older than `--months` (default: 3). These are candidates for removal — the feature has been live long enough that the flag is dead code.
 
 #### Global options
 
 | Option            | Default                             | Description                    |
 | ----------------- | ----------------------------------- | ------------------------------ |
-| `--config <path>` | `feature-toggles.config.js`         | Path to config file            |
+| `--config <path>` | *(scan source files)*               | Explicit config file override  |
 | `--root <path>`   | `.`                                 | Project root directory         |
 | `--src <path>`    | `src` *(check only)*                | Source directory to scan       |
 | `--months <n>`    | `3` *(stale only)*                  | Age threshold in months        |

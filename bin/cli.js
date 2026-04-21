@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
-import { resolve, join, extname } from 'node:path'
+import { resolve, join, extname, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 // ── ANSI colors ───────────────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ const root      = resolve(process.cwd(), rootArg)
 
 // ── Config loading ────────────────────────────────────────────────────────────
 async function loadConfig() {
+  // 1. Explicit --config flag or feature-toggles.config.{js,mjs,json} in root
   const candidates = configArg
     ? [resolve(process.cwd(), configArg)]
     : [
@@ -45,9 +46,7 @@ async function loadConfig() {
   for (const p of candidates) {
     if (!existsSync(p)) continue
     try {
-      if (p.endsWith('.json')) {
-        return JSON.parse(readFileSync(p, 'utf8'))
-      }
+      if (p.endsWith('.json')) return JSON.parse(readFileSync(p, 'utf8'))
       const mod = await import(pathToFileURL(p).href)
       return mod.default ?? mod
     } catch (e) {
@@ -57,8 +56,16 @@ async function loadConfig() {
     }
   }
 
-  console.error(c.red('No config file found.'))
-  console.error(c.dim('Expected: feature-toggles.config.js | .mjs | .json'))
+  // 2. Scan source files for app.use(FeatureToggles, { ... })
+  const found = await scanForPluginConfig()
+  if (found) {
+    const rel = found.sourceFile.replace(root + sep, '').replace(root + '/', '')
+    console.log(c.dim(`Config scanned from: ${rel}\n`))
+    return found.config
+  }
+
+  console.error(c.red('No feature toggles configuration found.'))
+  console.error(c.dim('Add app.use(FeatureToggles, { flags: { ... } }) in your app, or create feature-toggles.config.js'))
   process.exit(1)
 }
 
@@ -81,6 +88,135 @@ async function* walkFiles(dir) {
       yield full
     }
   }
+}
+
+// ── Static plugin config parser ───────────────────────────────────────────────
+// Extracts the text between matching braces starting at str[openIdx] === '{'
+function extractBracedBody(str, openIdx) {
+  let depth = 0, inStr = false, sc = ''
+  for (let i = openIdx; i < str.length; i++) {
+    const ch = str[i]
+    if (inStr) {
+      if (ch === sc && str[i - 1] !== '\\') inStr = false
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      inStr = true; sc = ch
+    } else if (ch === '{') {
+      depth++
+    } else if (ch === '}') {
+      depth--
+      if (depth === 0) return str.slice(openIdx + 1, i)
+    }
+  }
+  return null
+}
+
+// Finds `name: { ... }` at the top level of body and returns inner content
+function findSectionBody(body, name) {
+  const re = new RegExp(`(?:^|,)[ \\t]*['"]?${name}['"]?[ \\t]*:[ \\t]*\\{`, 'gm')
+  let m
+  while ((m = re.exec(body)) !== null) {
+    const openIdx = m.index + m[0].length - 1
+    const inner = extractBracedBody(body, openIdx)
+    if (inner !== null) return inner
+  }
+  return null
+}
+
+// Parse { key: literal, ... } — booleans, strings, numbers
+function parseFlatObject(body) {
+  const result = {}
+  const re = /['"]?(\w[\w$]*)['"]?\s*:\s*(true|false|null|-?\d+(?:\.\d+)?|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)/g
+  let m
+  while ((m = re.exec(body)) !== null) {
+    const raw = m[2]
+    if      (raw === 'true')  result[m[1]] = true
+    else if (raw === 'false') result[m[1]] = false
+    else if (raw === 'null')  result[m[1]] = null
+    else if (/^-?\d/.test(raw)) result[m[1]] = Number(raw)
+    else result[m[1]] = raw.slice(1, -1)   // strip surrounding quotes
+  }
+  return result
+}
+
+// Parse { key: { subkey: literal, ... }, ... }
+function parseNestedFlatObject(body) {
+  const result = {}
+  const re = /['"]?(\w[\w$]*)['"]?\s*:\s*\{/g
+  let m
+  while ((m = re.exec(body)) !== null) {
+    const openIdx = body.indexOf('{', m.index + m[0].length - 1)
+    if (openIdx === -1) continue
+    const inner = extractBracedBody(body, openIdx)
+    if (inner !== null) result[m[1]] = parseFlatObject(inner)
+  }
+  return result
+}
+
+// Parse { key: ['item', 'item'], ... }
+function parseArrayObject(body) {
+  const result = {}
+  const re = /['"]?(\w[\w$]*)['"]?\s*:\s*\[/g
+  let m
+  while ((m = re.exec(body)) !== null) {
+    const openIdx = body.indexOf('[', m.index + m[0].length - 1)
+    if (openIdx === -1) continue
+    let depth = 0, inStr = false, sc = '', end = -1
+    for (let i = openIdx; i < body.length; i++) {
+      const ch = body[i]
+      if (inStr) {
+        if (ch === sc && body[i - 1] !== '\\') inStr = false
+      } else if (ch === '"' || ch === "'" || ch === '`') {
+        inStr = true; sc = ch
+      } else if (ch === '[') depth++
+      else if (ch === ']') { depth--; if (depth === 0) { end = i; break } }
+    }
+    if (end === -1) continue
+    const items = []
+    const itemRe = /['"`]([^'"`]+)['"`]/g
+    let im
+    while ((im = itemRe.exec(body.slice(openIdx + 1, end))) !== null) items.push(im[1])
+    result[m[1]] = items
+  }
+  return result
+}
+
+// Walk source files and find app.use(FeatureToggles, { ... })
+async function scanForPluginConfig() {
+  for await (const file of walkFiles(root)) {
+    let content
+    try { content = readFileSync(file, 'utf8') } catch { continue }
+
+    const pluginMatch = /\.use\s*\(\s*FeatureToggles\s*,\s*\{/.exec(content)
+    if (!pluginMatch) continue
+
+    const openIdx = content.lastIndexOf('{', pluginMatch.index + pluginMatch[0].length)
+    if (openIdx === -1) continue
+
+    const configBody = extractBracedBody(content, openIdx)
+    if (!configBody) continue
+
+    const config = {}
+
+    const flagsBody = findSectionBody(configBody, 'flags')
+    if (flagsBody) config.flags = parseFlatObject(flagsBody)
+
+    const metaBody = findSectionBody(configBody, 'meta')
+    if (metaBody) config.meta = parseNestedFlatObject(metaBody)
+
+    const expiryBody = findSectionBody(configBody, 'expiry')
+    if (expiryBody) config.expiry = parseFlatObject(expiryBody)
+
+    const groupsBody = findSectionBody(configBody, 'groups')
+    if (groupsBody) config.groups = parseArrayObject(groupsBody)
+
+    const depsBody = findSectionBody(configBody, 'dependencies')
+    if (depsBody) config.dependencies = parseArrayObject(depsBody)
+
+    if (config.flags && Object.keys(config.flags).length > 0) {
+      return { config, sourceFile: file }
+    }
+  }
+  return null
 }
 
 // ── Flag reference extraction ─────────────────────────────────────────────────
@@ -145,78 +281,91 @@ function closestFlag(name, known) {
 
 // ── list command ──────────────────────────────────────────────────────────────
 async function cmdList(config) {
-  const flags    = config.flags    ?? {}
-  const meta     = config.meta     ?? {}
-  const expiry   = config.expiry   ?? {}
-  const groups   = config.groups   ?? {}
-  const now      = new Date()
+  const flags  = config.flags  ?? {}
+  const meta   = config.meta   ?? {}
+  const expiry = config.expiry ?? {}
+  const groups = config.groups ?? {}
+  const now    = new Date()
 
   const names = Object.keys(flags)
   if (names.length === 0) {
-    console.log(c.dim('No flags defined in config.'))
+    console.log(c.dim('\nNo flags defined in config.\n'))
     return
   }
 
-  // Build reverse group map
+  // Reverse group map: flag → [group, ...]
   const flagGroups = {}
   for (const [group, members] of Object.entries(groups)) {
     for (const f of members) {
-      flagGroups[f] = flagGroups[f] ? [...flagGroups[f], group] : [group]
+      if (!flagGroups[f]) flagGroups[f] = []
+      flagGroups[f].push(group)
     }
   }
 
-  const COL = { name: 0, value: 0, desc: 0 }
-  for (const n of names) {
-    COL.name  = Math.max(COL.name,  n.length)
-    COL.value = Math.max(COL.value, String(flags[n]).length)
-    COL.desc  = Math.max(COL.desc,  (meta[n]?.description ?? '').length)
-  }
-
-  console.log(c.bold(`\nFeature flags  ${c.dim(`(${names.length} total)`)}\n`))
-
-  for (const name of names) {
+  // Build plain-text rows (no color yet — needed for width calculation)
+  const rows = names.map(name => {
     const value   = flags[name]
     const m       = meta[name] ?? {}
     const exp     = expiry[name]
-    const grps    = flagGroups[name] ?? []
-
-    const isOn    = value === true || (typeof value === 'string' && value !== '')
-    const icon    = isOn ? c.green('✔') : c.dim('○')
-    const valStr  = typeof value === 'boolean'
-      ? (value ? c.green('true') : c.red('false'))
-      : c.cyan(`"${value}"`)
-
-    let expired = false
-    if (exp) {
-      const expDate = new Date(exp)
-      expired = !isNaN(expDate) && expDate < now
+    const expired = exp ? (new Date(exp) < now) : false
+    return {
+      name,
+      value:     String(value),
+      rawValue:  value,
+      source:    'static',
+      owner:     m.owner   ?? '',
+      added:     m.addedAt ?? '',
+      expiry:    expired ? '[EXPIRED]' : '',
+      groups:    (flagGroups[name] ?? []).join(', '),
+      isExpired: expired,
     }
+  })
 
-    const namePad = name.padEnd(COL.name)
-    const valPad  = String(value).padEnd(COL.value)
+  const HEADERS = ['Flag', 'Value', 'Source', 'Owner', 'Added', 'Expiry', 'Groups']
+  const KEYS    = ['name', 'value', 'source', 'owner', 'added', 'expiry', 'groups']
 
-    let line = `  ${icon}  ${c.bold(namePad)}  ${valStr.padEnd(COL.value + 10)}`
+  // Max width per column (header vs longest value)
+  const widths = HEADERS.map((h, i) =>
+    Math.max(h.length, ...rows.map(r => r[KEYS[i]].length)),
+  )
 
-    if (m.description) line += `  ${c.dim(m.description)}`
+  const totalWidth = widths.reduce((s, w) => s + w, 0) + 2 * (widths.length - 1)
 
-    const badges = []
-    if (expired)        badges.push(c.red('[expired]'))
-    if (m.owner)        badges.push(c.gray(`@${m.owner}`))
-    if (m.ticket)       badges.push(c.cyan(m.ticket))
-    if (grps.length)    badges.push(c.dim(`[${grps.join(', ')}]`))
-    if (m.addedAt)      badges.push(c.dim(`added ${m.addedAt}`))
+  console.log()
+  console.log(HEADERS.map((h, i) => c.bold(h.padEnd(widths[i]))).join('  '))
+  console.log(c.dim('─'.repeat(totalWidth)))
 
-    if (badges.length) line += `  ${badges.join('  ')}`
+  for (const row of rows) {
+    // Pad each cell to its column width BEFORE applying color —
+    // ANSI escape codes add invisible bytes that break padEnd alignment.
+    const cells = KEYS.map((k, i) => row[k].padEnd(widths[i]))
 
-    console.log(line)
+    const colored = [
+      row.isExpired ? c.yellow(cells[0]) : cells[0],
+      typeof row.rawValue === 'boolean'
+        ? (row.rawValue ? c.green(cells[1]) : c.red(cells[1]))
+        : c.cyan(cells[1]),
+      c.dim(cells[2]),
+      cells[3].trim() ? c.gray(cells[3]) : cells[3],
+      c.dim(cells[4]),
+      row.isExpired ? c.yellow(cells[5]) : cells[5],
+      c.dim(cells[6]),
+    ]
+
+    console.log(colored.join('  ').trimEnd())
   }
+
   console.log()
 }
 
 // ── check command ─────────────────────────────────────────────────────────────
 async function cmdCheck(config) {
   const known = new Set(Object.keys(config.flags ?? {}))
-  const srcDir = resolve(root, getFlag('--src', 'src'))
+
+  // Accept positional arg after 'check' (e.g. `check ./src`) or --src flag
+  const cmdIdx      = argv.indexOf('check')
+  const positional  = argv[cmdIdx + 1] && !argv[cmdIdx + 1].startsWith('-') ? argv[cmdIdx + 1] : null
+  const srcDir      = resolve(root, positional ?? getFlag('--src', 'src'))
 
   if (!existsSync(srcDir)) {
     console.error(c.red(`Source directory not found: ${srcDir}`))
@@ -225,39 +374,51 @@ async function cmdCheck(config) {
 
   console.log(c.bold(`\nChecking flag references in ${c.cyan(srcDir)}\n`))
 
-  const unknown = []    // { file, name, suggestion }
-  let filesScanned = 0
+  const foundValid   = new Set()          // known flag names referenced in source
+  const foundUnknown = new Map()          // name → suggestion
+  let filesScanned   = 0
 
   for await (const file of walkFiles(srcDir)) {
     filesScanned++
     let content
     try { content = readFileSync(file, 'utf8') } catch { continue }
 
-    const refs = extractFlagRefs(content)
-    for (const ref of refs) {
-      if (!known.has(ref)) {
-        unknown.push({ file, name: ref, suggestion: closestFlag(ref, known) })
+    for (const ref of extractFlagRefs(content)) {
+      if (known.has(ref)) {
+        foundValid.add(ref)
+      } else if (!foundUnknown.has(ref)) {
+        foundUnknown.set(ref, closestFlag(ref, known))
       }
     }
   }
 
   console.log(c.dim(`Scanned ${filesScanned} files, ${known.size} known flags.\n`))
 
-  if (unknown.length === 0) {
-    console.log(c.green('✔ All flag references are valid.\n'))
+  if (foundValid.size === 0 && foundUnknown.size === 0) {
+    console.log(c.dim('  No flag references found in source.\n'))
     return
   }
 
-  for (const { file, name, suggestion } of unknown) {
-    const rel = file.replace(root + '/', '').replace(root + '\\', '')
-    let msg = `  ${c.red('✖')}  ${c.bold(name)}  ${c.dim(rel)}`
-    if (suggestion) msg += `  ${c.yellow(`→ did you mean "${suggestion}"?`)}`
+  // Valid refs first
+  for (const name of [...foundValid].sort()) {
+    console.log(`  ✅ ${name}`)
+  }
+
+  // Unknown refs
+  for (const [name, suggestion] of foundUnknown) {
+    let msg = `  ❌ ${c.bold(name)}  — unknown flag`
+    if (suggestion) msg += `. Did you mean: ${c.yellow(suggestion)}?`
     console.log(msg)
   }
 
   console.log()
-  console.error(c.red(`${unknown.length} unknown flag reference(s) found.`))
-  process.exit(1)
+
+  if (foundUnknown.size > 0) {
+    console.error(c.red(`${foundUnknown.size} unknown flag reference(s) found.`))
+    process.exit(1)
+  } else {
+    console.log(c.green(`✔ All ${foundValid.size} flag reference(s) are valid.\n`))
+  }
 }
 
 // ── stale command ─────────────────────────────────────────────────────────────
