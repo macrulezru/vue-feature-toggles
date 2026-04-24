@@ -11,9 +11,12 @@ export type {
   FeatureProvider,
   FlagSource,
   FlagValue,
+  FlagDefinition,
   FlagName,
   FlagMeta,
+  FlagSchedule,
   SetFlagOptions,
+  WatchFlagOptions,
   LiveUpdatesOptions,
   FeatureFlagNames,
 } from './core/types'

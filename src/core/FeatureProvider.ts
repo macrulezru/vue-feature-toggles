@@ -5,8 +5,11 @@ import type {
   FeatureProvider,
   FlagSource,
   FlagValue,
+  FlagDefinition,
+  FlagSchedule,
   FlagMeta,
   SetFlagOptions,
+  WatchFlagOptions,
   LiveUpdatesOptions,
 } from './types'
 
@@ -28,7 +31,7 @@ function isFlagTruthy(val: FlagValue | undefined): boolean {
 function parseUrlValue(raw: string): FlagValue {
   if (raw === 'false' || raw === '0') return false
   if (raw === 'true' || raw === '1') return true
-  return raw // variant string
+  return raw
 }
 
 function parseVarValue(raw: string): unknown {
@@ -114,12 +117,33 @@ function checkExpiry(expiry: Record<string, string>): void {
 }
 
 // ---------------------------------------------------------------------------
+// Rollout — deterministic FNV-1a hash → [0, 1]
+// ---------------------------------------------------------------------------
+
+function hashToFloat(str: string): number {
+  let h = 2166136261 // FNV-1a offset basis (uint32)
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 16777619) >>> 0 // FNV prime, keep uint32
+  }
+  return h / 4294967295
+}
+
+function resolveFlagDef(name: string, def: FlagDefinition, userId?: string): FlagValue {
+  if (typeof def === 'object' && def !== null && 'rollout' in def) {
+    const key = `${userId ?? 'anonymous'}:${name}`
+    return hashToFloat(key) < def.rollout ? def.value : false
+  }
+  return def as FlagValue
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
 export function createFeatureProvider(options: FeatureTogglesOptions): FeatureProvider {
   const {
-    flags: staticFlags = {},
+    flags: rawFlags = {},
     loader,
     reloadInterval = 0,
     urlOverrides = import.meta.env?.DEV === true,
@@ -131,29 +155,38 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     rules = {},
     meta = {},
     expiry = {},
+    schedule = {},
     ssrState,
     liveUpdates,
+    userId,
   } = options
 
   checkExpiry(expiry)
 
+  // ── Resolve flag definitions (rollout evaluated once at init) ──────────────
+  const staticFlags: Record<string, FlagValue> = {}
+  const rolloutMap: Record<string, number> = {}
+
+  for (const [name, def] of Object.entries(rawFlags)) {
+    staticFlags[name] = resolveFlagDef(name, def, userId)
+    if (typeof def === 'object' && def !== null && 'rollout' in def) {
+      rolloutMap[name] = def.rollout
+    }
+  }
+
   // ── Reactive state ─────────────────────────────────────────────────────────
-  // ssrState pre-populates loader flags so there is no hydration mismatch
-  const loaderFlags = ref<Record<string, FlagValue>>(ssrState ?? {})
-
-  const persistedRaw = loadPersistedOverrides()
+  const loaderFlags     = ref<Record<string, FlagValue>>(ssrState ?? {})
+  const persistedRaw    = loadPersistedOverrides()
   const runtimeOverrides = ref<Record<string, FlagValue>>(persistedRaw)
-  const persistedKeys = ref<Set<string>>(new Set(Object.keys(persistedRaw)))
-
+  const persistedKeys   = ref<Set<string>>(new Set(Object.keys(persistedRaw)))
   const runtimeVariableOverrides = ref<Record<string, Record<string, unknown>>>({})
-
-  const urlQueryParams = ref(
+  const urlQueryParams  = ref(
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search)
       : new URLSearchParams(),
   )
   const isLoading = ref(false)
-  const isReady = ref(false)
+  const isReady   = ref(false)
 
   if (urlOverrides && typeof window !== 'undefined') {
     const sync = () => { urlQueryParams.value = new URLSearchParams(window.location.search) }
@@ -173,7 +206,6 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     return result
   })
 
-  // URL variable overrides: ?feature-var:flagName:varName=value
   const urlVariableOverrides = computed<Record<string, Record<string, unknown>>>(() => {
     if (!urlOverrides) return {}
     const varPrefix = `${urlPrefix}-var:`
@@ -184,14 +216,14 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
       const sep = rest.indexOf(':')
       if (sep === -1) return
       const flagName = rest.slice(0, sep)
-      const varName = rest.slice(sep + 1)
+      const varName  = rest.slice(sep + 1)
       if (!result[flagName]) result[flagName] = {}
       result[flagName][varName] = parseVarValue(value)
     })
     return result
   })
 
-  // ── Rules (evaluated inside computed — re-runs when reactive deps change) ──
+  // ── Rules ──────────────────────────────────────────────────────────────────
   const ruleFlags = computed<Record<string, boolean>>(() => {
     const result: Record<string, boolean> = {}
     for (const [name, rule] of Object.entries(rules)) {
@@ -200,9 +232,34 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     return result
   })
 
-  // ── Merged flags with priority chain + dependency resolution ──────────────
+  // ── Schedule ───────────────────────────────────────────────────────────────
+  // currentTime ticks every minute so schedules auto-apply without page reload
+  const currentTime = ref(new Date())
+  if (typeof window !== 'undefined' && Object.keys(schedule).length > 0) {
+    setInterval(() => { currentTime.value = new Date() }, 60_000)
+  }
+
+  const scheduleActiveMap = computed<Record<string, boolean>>(() => {
+    const now = currentTime.value
+    const result: Record<string, boolean> = {}
+    for (const [name, sch] of Object.entries(schedule)) {
+      let active = true
+      if (sch.from) {
+        const from = new Date(sch.from)
+        if (!isNaN(from.getTime()) && now < from) { result[name] = false; continue }
+      }
+      if (sch.to) {
+        const to = new Date(sch.to)
+        if (!isNaN(to.getTime()) && now > to) active = false
+      }
+      result[name] = active
+    }
+    return result
+  })
+
+  // ── Merged flags (priority chain + schedule + dependency resolution) ───────
   const warnedUnknown = new Set<string>()
-  const warnedDeps = new Set<string>()
+  const warnedDeps    = new Set<string>()
 
   const flags = computed<Record<string, FlagValue>>(() => {
     const merged: Record<string, FlagValue> = {}
@@ -215,12 +272,19 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     ])
 
     for (const key of allKeys) {
-      if (key in urlOverrideMap.value)    merged[key] = urlOverrideMap.value[key]
+      if (key in urlOverrideMap.value)       merged[key] = urlOverrideMap.value[key]
       else if (key in runtimeOverrides.value) merged[key] = runtimeOverrides.value[key]
-      else if (key in ruleFlags.value)    merged[key] = ruleFlags.value[key]
-      else if (key in loaderFlags.value)  merged[key] = loaderFlags.value[key]
-      else if (key in staticFlags)        merged[key] = staticFlags[key]
-      else                                merged[key] = defaultValue
+      else if (key in ruleFlags.value)        merged[key] = ruleFlags.value[key]
+      else if (key in loaderFlags.value)      merged[key] = loaderFlags.value[key]
+      else if (key in staticFlags)            merged[key] = staticFlags[key]
+      else                                    merged[key] = defaultValue
+    }
+
+    // Apply schedule — forced off unless URL or runtime override is present
+    for (const [flagName, isActive] of Object.entries(scheduleActiveMap.value)) {
+      if (!isActive && !(flagName in urlOverrideMap.value) && !(flagName in runtimeOverrides.value)) {
+        merged[flagName] = false
+      }
     }
 
     // Warn about dependency violations, then force-apply them
@@ -240,7 +304,7 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     return merged
   })
 
-  // ── isEnabled / unknown flag warning ───────────────────────────────────────
+  // ── isEnabled ──────────────────────────────────────────────────────────────
   const isEnabled = (name: string): boolean => {
     if (
       import.meta.env?.DEV === true &&
@@ -343,7 +407,7 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     return members.length > 0 && members.every(name => isFlagTruthy(flags.value[name]))
   }
 
-  // ── Dependencies info ──────────────────────────────────────────────────────
+  // ── Dependencies ───────────────────────────────────────────────────────────
   const getDependencyViolations = (): Record<string, string[]> => {
     const result: Record<string, string[]> = {}
     for (const [flag, deps] of Object.entries(dependencies)) {
@@ -365,16 +429,14 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     }
   }
 
-  // ssrState means we're already hydrated — mark ready immediately
   if (ssrState) {
     isReady.value = true
-    if (loader) reload() // refresh in background
+    if (loader) reload()
   } else {
     loader ? reload() : (isReady.value = true)
   }
   if (reloadInterval > 0 && loader) setInterval(reload, reloadInterval)
 
-  // Live updates (SSE / WebSocket) feed into loaderFlags as partial patches
   if (liveUpdates) {
     setupLiveUpdates(liveUpdates, (partial) => {
       loaderFlags.value = { ...loaderFlags.value, ...partial }
@@ -386,12 +448,13 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     if (name in urlOverrideMap.value)    return 'url'
     if (name in runtimeOverrides.value)  return 'runtime'
     if (name in ruleFlags.value)         return 'rules'
+    if (name in schedule && !scheduleActiveMap.value[name]) return 'schedule'
     if (name in loaderFlags.value)       return 'loader'
     if (name in staticFlags)             return 'static'
     return 'default'
   }
 
-  // ── Phase 1 additions ──────────────────────────────────────────────────────
+  // ── Metadata & expiry ──────────────────────────────────────────────────────
   const getFlagMeta = (name: string): FlagMeta | undefined => meta[name]
 
   const isExpired = (name: string): boolean => {
@@ -414,11 +477,35 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     if (typeof localStorage !== 'undefined') localStorage.removeItem(PERSIST_KEY)
   }
 
+  // ── watchFlag with optional debounce ──────────────────────────────────────
   const watchFlag = (
     name: string,
     callback: (value: boolean, oldValue: boolean) => void,
-  ): WatchStopHandle =>
-    watch(() => isFlagTruthy(flags.value[name]), callback)
+    opts: WatchFlagOptions = {},
+  ): WatchStopHandle => {
+    // Use computed so watch infers the correct boolean type from a Ref<boolean>
+    const source = computed(() => isFlagTruthy(flags.value[name]))
+
+    if (!opts.debounce) {
+      return watch(source, (val, old) => callback(val, old ?? val), { immediate: opts.immediate })
+    }
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let pendingOld: boolean | undefined
+    return watch(
+      source,
+      (newVal, oldVal) => {
+        if (timer === null) pendingOld = oldVal ?? newVal
+        else clearTimeout(timer)
+        timer = setTimeout(() => {
+          timer = null
+          callback(newVal, pendingOld!)
+          pendingOld = undefined
+        }, opts.debounce)
+      },
+      { immediate: opts.immediate },
+    )
+  }
 
   // ── Profiles ───────────────────────────────────────────────────────────────
   const saveProfile = (name: string, profileFlags: Record<string, FlagValue>): void => {
@@ -438,6 +525,15 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
   }
 
   const listProfiles = (): string[] => Object.keys(loadProfiles())
+
+  // ── Rollout introspection ──────────────────────────────────────────────────
+  const getRollout = (name: string): number | undefined => rolloutMap[name]
+
+  // ── Schedule introspection ─────────────────────────────────────────────────
+  const getSchedule = (name: string): FlagSchedule | undefined => schedule[name]
+
+  const isScheduleActive = (name: string): boolean =>
+    name in schedule ? (scheduleActiveMap.value[name] ?? true) : true
 
   // ── Introspection ──────────────────────────────────────────────────────────
   const listVariables = (flagName: string): string[] => {
@@ -481,6 +577,9 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     isPersisted,
     clearPersistedFlags,
     watchFlag,
+    getRollout,
+    getSchedule,
+    isScheduleActive,
     listVariables,
     listGroups,
   }

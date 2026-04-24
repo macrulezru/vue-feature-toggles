@@ -5,6 +5,7 @@ import type { FeatureProvider, FlagSource, FlagValue } from '../core/types'
 import { ALL_SOURCES } from './devtools/shared'
 import type { FlagEntry, HistoryEntry } from './devtools/shared'
 import DtButton from './devtools/DtButton.vue'
+import DtIcon from './devtools/DtIcon.vue'
 import DtFlagRow from './devtools/DtFlagRow.vue'
 import DtGroupRow from './devtools/DtGroupRow.vue'
 import DtHistoryRow from './devtools/DtHistoryRow.vue'
@@ -346,9 +347,7 @@ function resetAllGroups() {
           style="background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;display:flex;align-items:center"
           @click="collapsed = !collapsed"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :style="chevronStyle">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <DtIcon name="chevron-down" :style="chevronStyle" />
         </button>
       </div>
     </div>
@@ -436,24 +435,18 @@ function resetAllGroups() {
               @keydown.enter="saveProfile"
               style="width:90px;padding:3px 5px;border-radius:4px;border:1px solid #d1d5db;font-size:10px;outline:none"
             />
-            <DtButton style="padding:3px 6px" @click="saveProfile">Save</DtButton>
+            <DtButton @click="saveProfile">Save</DtButton>
           </div>
           <!-- Action buttons -->
           <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <DtButton :flex="true" style="padding:4px" @click="provider.resetAll()">Reset all</DtButton>
-            <DtButton style="padding:4px 7px" title="Reload from loader" @click="provider.reload()">↺</DtButton>
-            <DtButton style="padding:4px 7px" @click="copyUrl">{{ copyLabel }}</DtButton>
-            <DtButton style="padding:4px 7px" title="Copy overrides as JSON" @click="exportOverrides">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block">
-                <line x1="6" y1="10" x2="6" y2="3" /><polyline points="3,6 6,3 9,6" /><line x1="1" y1="11" x2="11" y2="11" />
-              </svg>
-              export
+            <DtButton :flex="true" @click="provider.resetAll()">Reset all</DtButton>
+            <DtButton title="Reload from loader" @click="provider.reload()">↺</DtButton>
+            <DtButton @click="copyUrl">{{ copyLabel }}</DtButton>
+            <DtButton title="Copy overrides as JSON" @click="exportOverrides">
+              <DtIcon name="export" /> export
             </DtButton>
-            <DtButton style="padding:4px 7px" :active="showImport" @click="showImport = !showImport">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block">
-                <line x1="6" y1="2" x2="6" y2="9" /><polyline points="3,6 6,9 9,6" /><line x1="1" y1="11" x2="11" y2="11" />
-              </svg>
-              import
+            <DtButton :active="showImport" @click="showImport = !showImport">
+              <DtIcon name="import" /> import
             </DtButton>
           </div>
           <!-- Import section -->
@@ -465,7 +458,7 @@ function resetAllGroups() {
               style="width:100%;height:54px;padding:4px;border-radius:4px;border:1px solid #d1d5db;font-size:10px;font-family:ui-monospace;resize:vertical;box-sizing:border-box"
             />
             <div style="display:flex;gap:4px">
-              <DtButton :flex="true" style="padding:3px" @click="applyImport">Apply</DtButton>
+              <DtButton :flex="true" @click="applyImport">Apply</DtButton>
               <DtButton @click="showImport = false; importJson = ''">Cancel</DtButton>
             </div>
           </div>
@@ -496,9 +489,7 @@ function resetAllGroups() {
         </div>
         <div :style="footerStyle">
           <DtButton
-            variant="danger"
             :flex="true"
-            style="padding:4px"
             :disabled="groupEntries.length === 0"
             @click="resetAllGroups"
           >Reset all groups</DtButton>
@@ -524,7 +515,7 @@ function resetAllGroups() {
         </div>
         <div :style="footerStyle">
           <div style="display:flex;gap:5px;align-items:center">
-            <DtButton style="padding:4px 8px" @click="history = []">Clear</DtButton>
+            <DtButton @click="history = []">Clear</DtButton>
             <span style="font-size:10px;color:#9ca3af">{{ history.length }} / 20</span>
           </div>
         </div>

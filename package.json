@@ -1,6 +1,6 @@
 {
   "name": "vue-feature-toggles",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Lightweight, backend-agnostic feature flags plugin for Vue 3",
   "type": "module",
   "main": "./dist/vue-feature-toggles.cjs",
@@ -20,6 +20,14 @@
       "import": "./dist/storybook.js",
       "require": "./dist/storybook.cjs"
     },
+    "./adapters": {
+      "import": "./dist/adapters.js",
+      "require": "./dist/adapters.cjs"
+    },
+    "./vite": {
+      "import": "./dist/vite.js",
+      "require": "./dist/vite.cjs"
+    },
     "./nuxt": "./nuxt/module.ts"
   },
   "bin": {
@@ -28,7 +36,8 @@
   "files": [
     "dist",
     "nuxt",
-    "bin"
+    "bin",
+    "src/vite.ts"
   ],
   "scripts": {
     "dev": "vite serve demo --config demo/vite.config.ts",
@@ -50,6 +59,7 @@
   "devDependencies": {
     "@nuxt/kit": "^3.17.3",
     "@nuxt/schema": "^3.17.3",
+    "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/devtools-api": "^8.1.1",
     "typescript": "^5.8.3",
