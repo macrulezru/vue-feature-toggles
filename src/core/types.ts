@@ -17,7 +17,18 @@ export type FlagName = keyof FeatureFlagNames extends never ? string : keyof Fea
 /** A flag value is either a boolean toggle or a variant string (for A/B flags) */
 export type FlagValue = boolean | string
 
-export type FlagSource = 'url' | 'runtime' | 'rules' | 'loader' | 'static' | 'default'
+/**
+ * A flag definition — either a plain value or an object with a rollout percentage.
+ * Rollout is evaluated deterministically per userId + flagName.
+ *
+ * @example
+ * flags: {
+ *   newCheckout: { value: true, rollout: 0.2 }  // enabled for 20% of users
+ * }
+ */
+export type FlagDefinition = FlagValue | { value: FlagValue; rollout: number }
+
+export type FlagSource = 'url' | 'runtime' | 'rules' | 'loader' | 'static' | 'schedule' | 'default'
 
 export interface FlagMeta {
   description?: string
@@ -26,8 +37,27 @@ export interface FlagMeta {
   ticket?: string
 }
 
+/**
+ * Schedule for a flag — constrains when the flag is active.
+ * Outside the window the flag is forced to its inactive state
+ * (unless overridden via URL or runtime setFlag).
+ */
+export interface FlagSchedule {
+  /** ISO date string — flag becomes active on this date */
+  from?: string
+  /** ISO date string — flag becomes inactive after this date */
+  to?: string
+}
+
 export interface SetFlagOptions {
   persist?: boolean
+}
+
+export interface WatchFlagOptions {
+  /** Debounce callback by N ms — useful to avoid analytics spam on rapid DevTools toggling */
+  debounce?: number
+  /** Fire the callback immediately with the current value */
+  immediate?: boolean
 }
 
 export interface LiveUpdatesOptions {
@@ -38,13 +68,26 @@ export interface LiveUpdatesOptions {
 }
 
 export interface FeatureTogglesOptions {
-  /** Boolean and variant (string) flag values */
-  flags?: Record<string, FlagValue>
+  /** Boolean, variant, or rollout flag definitions */
+  flags?: Record<string, FlagDefinition>
   loader?: () => Promise<Record<string, FlagValue>>
   reloadInterval?: number
   urlOverrides?: boolean
   urlPrefix?: string
   defaultValue?: boolean
+
+  /**
+   * User identifier for deterministic rollout evaluation.
+   * Same userId always resolves to the same on/off result for a given rollout flag.
+   */
+  userId?: string
+
+  /**
+   * Schedule per flag — constrains when flags are active.
+   * @example
+   * schedule: { christmasBanner: { from: '2025-12-01', to: '2026-01-10' } }
+   */
+  schedule?: Record<string, FlagSchedule>
 
   /**
    * Server-side flag snapshot passed to the client to prevent hydration mismatch.
@@ -114,12 +157,19 @@ export interface FeatureProvider {
   // SSR
   serialize: () => Record<string, FlagValue>
 
-  // Phase 1
+  // Metadata & expiry
   getFlagMeta: (name: string) => FlagMeta | undefined
   isExpired: (name: string) => boolean
   isPersisted: (name: string) => boolean
   clearPersistedFlags: () => void
-  watchFlag: (name: string, callback: (value: boolean, oldValue: boolean) => void) => WatchStopHandle
+  watchFlag: (name: string, callback: (value: boolean, oldValue: boolean) => void, options?: WatchFlagOptions) => WatchStopHandle
+
+  // Rollout
+  getRollout: (name: string) => number | undefined
+
+  // Schedule
+  getSchedule: (name: string) => FlagSchedule | undefined
+  isScheduleActive: (name: string) => boolean
 
   // Introspection (DevTools / CLI)
   listVariables: (flagName: string) => string[]

@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+/**
+ * size:
+ *   (default) — footer/action buttons  4px 8px
+ *   sm        — row-level buttons       2px 6px
+ *   xs        — compact inline buttons  1px 5px
+ */
 const props = defineProps<{
-  size?: 'xs' | 'sm'
+  size?: 'sm' | 'xs'
   variant?: 'default' | 'danger' | 'success' | 'primary'
   active?: boolean
   flex?: boolean
@@ -11,18 +17,24 @@ const props = defineProps<{
 }>()
 
 const style = computed(() => {
-  const padding = props.size === 'xs' ? '1px 5px' : '2px 7px'
+  const padding =
+    props.size === 'xs' ? '1px 5px' :
+    props.size === 'sm' ? '2px 6px' :
+                          '4px 8px'
+
   const base = {
     padding,
     borderRadius: '3px',
-    cursor: props.disabled ? 'not-allowed' : 'pointer',
-    fontSize: '10px',
-    flexShrink: 0,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    opacity: props.disabled ? 0.5 : 1,
-    ...(props.flex ? { flex: 1 } : {}),
+    cursor:       props.disabled ? 'not-allowed' : 'pointer',
+    fontSize:     '11px',
+    lineHeight:   1,
+    flexShrink:   0,
+    display:      'inline-flex',
+    alignItems:   'center',
+    gap:          '4px',
+    opacity:      props.disabled ? 0.5 : 1,
+    whiteSpace:   'nowrap' as const,
+    ...(props.flex ? { flex: 1, justifyContent: 'center' } : {}),
   }
 
   if (props.variant === 'danger') {
@@ -36,9 +48,9 @@ const style = computed(() => {
   }
   return {
     ...base,
-    border: '1px solid #d1d5db',
+    border:     '1px solid #d1d5db',
     background: props.active ? '#ede9fe' : '#fff',
-    color: props.active ? '#5b21b6' : '#374151',
+    color:      props.active ? '#5b21b6' : '#374151',
   }
 })
 </script>

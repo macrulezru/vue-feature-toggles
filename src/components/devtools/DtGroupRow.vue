@@ -2,6 +2,7 @@
 import type { FlagValue } from '../../core/types'
 import DtButton from './DtButton.vue'
 import DtToggle from './DtToggle.vue'
+import DtIcon from './DtIcon.vue'
 
 const props = defineProps<{
   name: string
@@ -35,9 +36,7 @@ function isMemberOn(member: string): boolean {
         @update:model-value="$event ? emit('enableAll') : emit('disableAll')"
       />
       <DtButton size="xs" variant="danger" title="Reset group overrides" @click="$emit('reset')">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block">
-          <line x1="2" y1="2" x2="8" y2="8" /><line x1="8" y1="2" x2="2" y2="8" />
-        </svg>
+        <DtIcon name="x" />
       </DtButton>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:3px;padding-left:2px">

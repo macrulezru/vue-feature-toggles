@@ -5,6 +5,7 @@ import type { FlagEntry } from './shared'
 import DtBadge from './DtBadge.vue'
 import DtButton from './DtButton.vue'
 import DtToggle from './DtToggle.vue'
+import DtIcon from './DtIcon.vue'
 
 defineOptions({ inheritAttrs: false })
 
@@ -46,20 +47,15 @@ const metaTitle = computed(() => {
   return parts.join('\n') || undefined
 })
 
-const srcStyle = computed(() => SOURCE_STYLES[props.entry.source])
-
-const variantBadgeStyle = { bg: '#ede9fe', color: '#5b21b6' }
-
+const srcStyle  = computed(() => SOURCE_STYLES[props.entry.source])
 const variantLabel = computed(() =>
   typeof props.entry.value === 'string' ? props.entry.value : '',
 )
-
 const rowBg = computed(() => {
   if (props.entry.isExpired) return '#fffbeb'
   if (props.entry.depViolations.length > 0) return '#fff7ed'
   return undefined
 })
-
 const nameColor = computed(() => {
   if (props.entry.isExpired) return '#92400e'
   if (props.entry.depViolations.length > 0) return '#9a3412'
@@ -67,7 +63,7 @@ const nameColor = computed(() => {
 })
 
 function onVarKeydown(e: KeyboardEvent, varName: string) {
-  if (e.key === 'Enter') emit('setVar', varName)
+  if (e.key === 'Enter')  emit('setVar', varName)
   if (e.key === 'Escape') emit('varInput', varName, props.varValues[varName] ?? '')
 }
 </script>
@@ -81,17 +77,15 @@ function onVarKeydown(e: KeyboardEvent, varName: string) {
       background: rowBg,
     }"
   >
+    <!-- Name -->
     <span
       :title="metaTitle"
-      :style="{
-        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        color: nameColor,
-      }"
+      :style="{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: nameColor }"
     >
       {{ entry.name }}
-      <span v-if="entry.isExpired"   style="margin-left:4px;font-size:10px;color:#d97706" title="Expired">⚠</span>
+      <span v-if="entry.isExpired"          style="margin-left:4px;font-size:10px;color:#d97706" title="Expired">⚠</span>
       <span v-if="entry.depViolations.length" style="margin-left:4px;font-size:10px;color:#dc2626" :title="`Requires: ${entry.depViolations.join(', ')}`">⛓</span>
-      <span v-if="entry.meta"        style="margin-left:3px;font-size:10px;color:#9ca3af;cursor:help" :title="metaTitle">ℹ</span>
+      <span v-if="entry.meta"               style="margin-left:3px;font-size:10px;color:#9ca3af;cursor:help" :title="metaTitle">ℹ</span>
     </span>
 
     <span v-if="entry.isPersisted" title="Persisted in localStorage" style="font-size:10px">💾</span>
@@ -115,9 +109,7 @@ function onVarKeydown(e: KeyboardEvent, varName: string) {
       </div>
       <DtBadge
         v-else
-        :bg="variantBadgeStyle.bg"
-        :color="variantBadgeStyle.color"
-        :bold="true"
+        bg="#ede9fe" color="#5b21b6" :bold="true"
         style="cursor:pointer;user-select:none"
         title="Click to edit"
         @click="$emit('startEdit')"
@@ -129,20 +121,18 @@ function onVarKeydown(e: KeyboardEvent, varName: string) {
       <DtToggle :model-value="entry.value as boolean" @update:model-value="$emit('toggle')" />
     </template>
 
+    <!-- Reset override -->
     <DtButton
       v-if="entry.isOverridden && !isEditing"
-      size="xs"
-      variant="danger"
+      size="xs" variant="danger"
       title="Reset override"
       @click="$emit('reset')"
-    >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block">
-        <line x1="2" y1="2" x2="8" y2="8" /><line x1="8" y1="2" x2="2" y2="8" />
-      </svg>
-    </DtButton>
+    ><DtIcon name="x" /></DtButton>
 
+    <!-- Expand variables -->
     <DtButton
       v-if="entry.hasVars"
+      size="sm"
       :title="`${entry.varNames.length} variable${entry.varNames.length !== 1 ? 's' : ''}`"
       :active="isVarsOpen"
       @click="$emit('toggleVars')"
