@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { FlagSource, FlagValue } from '../../core/types'
+import type { FlagSource, FlagValue } from '../core/types'
 import { SOURCE_STYLES } from './shared'
-import DtBadge from './DtBadge.vue'
+import DtBadge from './dt-badge.vue'
 
 const props = defineProps<{
   time: string

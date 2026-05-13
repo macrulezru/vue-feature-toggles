@@ -2,10 +2,10 @@
 import { ref, watch, nextTick, computed } from 'vue'
 import { SOURCE_STYLES } from './shared'
 import type { FlagEntry } from './shared'
-import DtBadge from './DtBadge.vue'
-import DtButton from './DtButton.vue'
-import DtToggle from './DtToggle.vue'
-import DtIcon from './DtIcon.vue'
+import DtBadge from './dt-badge.vue'
+import DtButton from './dt-button.vue'
+import DtToggle from './dt-toggle.vue'
+import DtIcon from './dt-icon.vue'
 
 defineOptions({ inheritAttrs: false })
 

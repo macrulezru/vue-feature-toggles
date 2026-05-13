@@ -288,7 +288,16 @@ const {
   serialize,   // () => Record<string, FlagValue>
 
   // Subscriptions
-  watchFlag,   // (name, callback) => WatchStopHandle
+  watchFlag,   // (name, callback, options?) => WatchStopHandle
+
+  // Rollout introspection
+  getRollout,       // (name) => number | undefined
+  getSchedule,      // (name) => FlagSchedule | undefined
+  isScheduleActive, // (name) => boolean
+
+  // Introspection
+  listVariables, // (flagName) => string[]
+  listGroups,    // () => Record<string, string[]>
 } = useFeatureProvider()
 ```
 
@@ -481,7 +490,7 @@ Serialize flags on the server and pass them to the client to prevent hydration m
 
 ```ts
 // server.ts
-import { serializeFlags } from 'vue-feature-toggles/ssr'
+import { serializeFlags } from 'vue-feature-toggles'
 
 const provider = createFeatureProvider({ loader: fetchFlags })
 await provider.reload()
@@ -882,6 +891,72 @@ Reports boolean `true` flags whose `meta.addedAt` is older than `--months` (defa
 
 ---
 
+## Adapter loaders
+
+Pre-built loaders for common flag management services, imported from `vue-feature-toggles/adapters`.
+
+```ts
+import { launchDarklyLoader, unleashLoader, flagsmithLoader } from 'vue-feature-toggles/adapters'
+```
+
+#### LaunchDarkly
+
+```ts
+app.use(FeatureToggles, {
+  loader: launchDarklyLoader({
+    clientSideId: 'your-client-side-id',
+    user: { key: userId },
+  }),
+})
+```
+
+#### Unleash
+
+```ts
+app.use(FeatureToggles, {
+  loader: unleashLoader({
+    url:       'https://unleash.example.com/api',
+    appName:   'my-app',
+    clientKey: 'default:development.abc123',
+    userId,    // optional — adds UNLEASH-INSTANCEID header
+  }),
+})
+```
+
+#### Flagsmith
+
+```ts
+app.use(FeatureToggles, {
+  loader: flagsmithLoader({
+    apiKey:   'ser.your-api-key',
+    identity: userId, // optional — enables per-user evaluation
+  }),
+})
+```
+
+---
+
+## Vite plugin
+
+Automatically strips `<FeatureDevTools>` and its import from all source files during production builds — no `v-if="isDev"` wrapper needed.
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { featureTogglesPlugin } from 'vue-feature-toggles/vite'
+
+export default defineConfig({
+  plugins: [vue(), featureTogglesPlugin()],
+})
+```
+
+| Option           | Default | Description                                            |
+| ---------------- | ------- | ------------------------------------------------------ |
+| `stripDevTools`  | `true`  | Remove `<FeatureDevTools>` from templates in prod      |
+
+---
+
 ## Loader providers
 
 The plugin is backend-agnostic — pass any async function as `loader`:
@@ -987,9 +1062,31 @@ import { createTestFeatureProvider, withFeatures, setTestFlag, resetTestProvider
 // Storybook decorator (excluded from production bundle)
 import { withFeatureToggles } from 'vue-feature-toggles/storybook'
 
+// Adapter loaders (LaunchDarkly, Unleash, Flagsmith)
+import { launchDarklyLoader, unleashLoader, flagsmithLoader } from 'vue-feature-toggles/adapters'
+
+// Vite plugin — strips <FeatureDevTools> in production builds
+import { featureTogglesPlugin } from 'vue-feature-toggles/vite'
+
 // Nuxt module
 // modules: ['vue-feature-toggles/nuxt']
 ```
+
+---
+
+## Development
+
+```sh
+npm run dev        # serve demo app with HMR
+npm run build      # build all entry points to dist/
+npm run typecheck  # TypeScript checks via vue-tsc
+npm test           # run tests once (vitest)
+npm run test:watch # run tests in watch mode
+```
+
+Tests live in `src/__tests__/`. The suite covers helpers, rollout, persistence, the full provider priority chain, and all composables via `@vue/test-utils`.
+
+CI runs on every push and pull request to `master`: typecheck → build → test.
 
 ---
 
