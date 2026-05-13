@@ -1,4 +1,4 @@
-import type { FlagSource, FlagValue, FlagMeta } from '../../core/types'
+import type { FlagSource, FlagValue, FlagMeta } from '../core/types'
 
 export const SOURCE_STYLES: Record<FlagSource, { bg: string; color: string }> = {
   url:      { bg: '#dbeafe', color: '#1e40af' },

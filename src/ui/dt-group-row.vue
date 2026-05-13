@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { FlagValue } from '../../core/types'
-import DtButton from './DtButton.vue'
-import DtToggle from './DtToggle.vue'
-import DtIcon from './DtIcon.vue'
+import type { FlagValue } from '../core/types'
+import DtButton from './dt-button.vue'
+import DtToggle from './dt-toggle.vue'
+import DtIcon from './dt-icon.vue'
 
 const props = defineProps<{
   name: string

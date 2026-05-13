@@ -28,9 +28,11 @@ const shouldShow = computed(() => {
 const fallbackComponent = computed(() =>
   props.fallback && typeof props.fallback === 'object' ? (props.fallback as Component) : null,
 )
+
 const fallbackText = computed(() =>
   typeof props.fallback === 'string' ? props.fallback : '',
 )
+
 </script>
 
 <template>

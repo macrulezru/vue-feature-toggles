@@ -15,8 +15,8 @@
  */
 import { defineComponent, provide, h } from 'vue'
 import { createFeatureProvider, FEATURE_PROVIDER_KEY } from './core/FeatureProvider'
-import Feature from './components/Feature.vue'
-import FeatureVariant from './components/FeatureVariant.vue'
+import Feature from './components/feature.vue'
+import FeatureVariant from './components/feature-variant.vue'
 import { vFeature } from './directives/vFeature'
 import type { FlagValue, FeatureTogglesOptions } from './core/types'
 
@@ -28,11 +28,15 @@ import type { FlagValue, FeatureTogglesOptions } from './core/types'
  *
  * Per-story flags are merged on top of defaultFlags via `parameters.featureToggles`.
  */
+interface StoryContext {
+  parameters?: { featureToggles?: Record<string, FlagValue> }
+}
+
 export function withFeatureToggles(
   defaultFlags: Record<string, FlagValue> = {},
   options: Omit<FeatureTogglesOptions, 'flags' | 'loader'> = {},
 ) {
-  return (story: any, context: any) => {
+  return (story: () => unknown, context: StoryContext) => {
     const storyFlags: Record<string, FlagValue> = context?.parameters?.featureToggles ?? {}
     const flags = { ...defaultFlags, ...storyFlags }
 

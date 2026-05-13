@@ -1,7 +1,7 @@
 import type { App, Plugin } from 'vue'
 import { createFeatureProvider, FEATURE_PROVIDER_KEY } from './core/FeatureProvider'
-import Feature from './components/Feature.vue'
-import FeatureVariant from './components/FeatureVariant.vue'
+import Feature from './components/feature.vue'
+import FeatureVariant from './components/feature-variant.vue'
 import { vFeature } from './directives/vFeature'
 import type { FeatureTogglesOptions } from './core/types'
 
