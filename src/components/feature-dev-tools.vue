@@ -1,22 +1,63 @@
 <script setup lang="ts">
-import { inject, computed, ref, watch } from 'vue'
+import { inject, computed, ref, provide, watch } from 'vue'
 import { FEATURE_PROVIDER_KEY } from '../core/FeatureProvider'
 import type { FeatureProvider, FlagSource, FlagValue } from '../core/types'
 import { ALL_SOURCES } from '../ui/shared'
 import type { FlagEntry, HistoryEntry } from '../ui/shared'
+import { DT_THEME_KEY, LIGHT_THEME, DARK_THEME } from '../ui/theme'
+import type { DtTheme } from '../ui/theme'
 import DtButton from '../ui/dt-button.vue'
 import DtIcon from '../ui/dt-icon.vue'
+import DtSearch from '../ui/dt-search.vue'
+import DtSelect from '../ui/dt-select.vue'
 import DtFlagRow from '../ui/dt-flag-row.vue'
 import DtGroupRow from '../ui/dt-group-row.vue'
 import DtHistoryRow from '../ui/dt-history-row.vue'
 
 type Tab = 'flags' | 'groups' | 'history'
 
-const props = withDefaults(defineProps<{ title?: string }>(), { title: 'Feature Toggles' })
+const props = withDefaults(defineProps<{
+  title?: string
+  theme?: 'light' | 'dark' | 'auto'
+}>(), {
+  title: 'Feature Toggles',
+  theme: 'auto',
+})
 
 const provider = inject<FeatureProvider>(FEATURE_PROVIDER_KEY)
 
-// ── Panel state ─────────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────
+const prefersDark = ref(
+  typeof window !== 'undefined'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : false,
+)
+
+if (typeof window !== 'undefined') {
+  window.matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', e => { prefersDark.value = e.matches })
+}
+
+const themeOverride = ref<DtTheme | null>(null)
+
+const effectiveTheme = computed<DtTheme>(() => {
+  if (themeOverride.value) return themeOverride.value
+  if (props.theme === 'dark')  return 'dark'
+  if (props.theme === 'light') return 'light'
+  return prefersDark.value ? 'dark' : 'light'
+})
+
+provide(DT_THEME_KEY, effectiveTheme)
+
+function toggleTheme() {
+  themeOverride.value = effectiveTheme.value === 'dark' ? 'light' : 'dark'
+}
+
+const themeVars = computed(() =>
+  effectiveTheme.value === 'dark' ? DARK_THEME : LIGHT_THEME
+)
+
+// ── Panel state ───────────────────────────────────────────────────────────────
 const collapsed      = ref(false)
 const activeTab      = ref<Tab>('flags')
 const searchQuery    = ref('')
@@ -32,7 +73,7 @@ const varInputs      = ref<Record<string, Record<string, string>>>({})
 const editingVariant      = ref<string | null>(null)
 const editingVariantValue = ref('')
 
-// ── Initial position ─────────────────────────────────────────────────────────
+// ── Initial position ──────────────────────────────────────────────────────────
 function getInitialPos() {
   if (typeof sessionStorage !== 'undefined') {
     try {
@@ -41,7 +82,7 @@ function getInitialPos() {
     } catch {}
   }
   if (typeof window !== 'undefined') {
-    return { x: Math.max(20, window.innerWidth - 460), y: Math.max(20, window.innerHeight - 640) }
+    return { x: Math.max(20, window.innerWidth - 480), y: Math.max(20, window.innerHeight - 660) }
   }
   return { x: 20, y: 20 }
 }
@@ -113,13 +154,17 @@ const groupEntries = computed(() => {
 
 const profileNames = computed(() => provider?.listProfiles() ?? [])
 
-const tabDefs = computed(() => [
-  { key: 'flags'   as const, label: 'Flags',   badge: Object.keys(provider?.flags.value ?? {}).length },
-  { key: 'groups'  as const, label: 'Groups',  badge: Object.keys(provider?.listGroups() ?? {}).length },
-  { key: 'history' as const, label: 'History', badge: history.value.length },
+const sourceOptions = computed(() => [
+  { value: '', label: 'All sources' },
+  ...ALL_SOURCES.map(s => ({ value: s, label: s })),
 ])
 
-// Current variable values for expanded flags
+const tabDefs = computed(() => [
+  { key: 'flags'   as const, label: 'Flags',   icon: 'flag'   as const, badge: Object.keys(provider?.flags.value ?? {}).length },
+  { key: 'groups'  as const, label: 'Groups',  icon: 'layers' as const, badge: Object.keys(provider?.listGroups() ?? {}).length },
+  { key: 'history' as const, label: 'History', icon: 'clock'  as const, badge: history.value.length },
+])
+
 const varValuesMap = computed(() => {
   const result: Record<string, Record<string, string>> = {}
   if (!provider) return result
@@ -136,41 +181,43 @@ const varValuesMap = computed(() => {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const panelStyle = computed(() => ({
-  position:   'fixed' as const,
-  left:       `${pos.value.x}px`,
-  top:        `${pos.value.y}px`,
-  zIndex:     99999,
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-  fontSize:   '12px',
-  lineHeight: 1.5,
-  color:      '#1f2937',
-  background: '#ffffff',
-  border:     '1px solid #e5e7eb',
-  borderRadius: '8px',
-  boxShadow:  '0 4px 24px rgba(0,0,0,.12)',
-  minWidth:   '320px',
-  maxWidth:   '460px',
-  maxHeight:  '640px',
-  overflow:   'hidden',
-  display:    'flex',
+  position:      'fixed' as const,
+  left:          `${pos.value.x}px`,
+  top:           `${pos.value.y}px`,
+  zIndex:        99999,
+  fontFamily:    'ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontSize:      '12px',
+  lineHeight:    1.5,
+  color:         'var(--dt-text)',
+  background:    'var(--dt-bg)',
+  border:        '1px solid var(--dt-border)',
+  borderRadius:  '10px',
+  boxShadow:     'var(--dt-shadow)',
+  minWidth:      '320px',
+  maxWidth:      '460px',
+  maxHeight:     '660px',
+  overflow:      'hidden',
+  display:       'flex',
   flexDirection: 'column' as const,
+  ...themeVars.value,
 }))
 
 const headerStyle = computed(() => ({
-  display:         'flex',
-  alignItems:      'center',
-  justifyContent:  'space-between',
-  padding:         '7px 12px',
-  background:      '#f9fafb',
-  borderBottom:    collapsed.value ? 'none' : '1px solid #e5e7eb',
-  borderRadius:    collapsed.value ? '8px' : '8px 8px 0 0',
-  cursor:          'grab',
-  userSelect:      'none' as const,
+  display:        'flex',
+  alignItems:     'center',
+  justifyContent: 'space-between',
+  padding:        '9px 12px',
+  background:     'var(--dt-bg-subtle)',
+  borderBottom:   collapsed.value ? 'none' : '1px solid var(--dt-border)',
+  borderRadius:   collapsed.value ? '10px' : '10px 10px 0 0',
+  cursor:         'grab',
+  userSelect:     'none' as const,
 }))
 
 const statusStyle = computed(() => ({
-  fontSize: '10px',
-  color: provider?.isLoading.value ? '#d97706' : '#10b981',
+  fontSize:   '10px',
+  color:      provider?.isLoading.value ? 'var(--dt-warn)' : 'var(--dt-success)',
+  flexShrink: 0,
 }))
 
 const statusText = computed(() =>
@@ -185,24 +232,56 @@ const chevronStyle = computed(() => ({
 function tabStyle(key: Tab) {
   const active = activeTab.value === key
   return {
-    padding:      '5px 10px 4px',
+    display:      'inline-flex',
+    alignItems:   'center',
+    gap:          '5px',
+    padding:      '5px 10px',
+    borderRadius: '6px',
     border:       'none',
-    background:   'none',
-    cursor:       'pointer',
     fontSize:     '11px',
-    fontWeight:   active ? 700 : 400,
-    color:        active ? '#111827' : '#9ca3af',
-    borderBottom: active ? '2px solid #374151' : '2px solid transparent',
-    marginBottom: '-1px',
+    fontWeight:   active ? 600 : 500,
+    color:        active ? 'var(--dt-accent)' : 'var(--dt-text-muted)',
+    background:   active ? 'var(--dt-bg)' : 'transparent',
+    cursor:       'pointer',
+    transition:   'all .15s',
+    boxShadow:    active ? '0 1px 3px rgba(0,0,0,.1)' : 'none',
+    flexShrink:   0,
+  }
+}
+
+function tabBadgeStyle(key: Tab) {
+  const active = activeTab.value === key
+  return {
+    fontSize:    '9px',
+    fontWeight:  700,
+    padding:     '1px 5px',
+    borderRadius: '8px',
+    background:  active ? 'var(--dt-accent-bg)' : 'var(--dt-bg-muted)',
+    color:       active ? 'var(--dt-accent)' : 'var(--dt-text-faint)',
+    lineHeight:  1.5,
+    minWidth:    '16px',
+    textAlign:   'center' as const,
   }
 }
 
 const footerStyle = {
   padding:      '7px 10px',
-  borderTop:    '1px solid #e5e7eb',
-  background:   '#f9fafb',
-  borderRadius: '0 0 8px 8px',
+  borderTop:    '1px solid var(--dt-border)',
+  background:   'var(--dt-bg-subtle)',
+  borderRadius: '0 0 10px 10px',
   flexShrink:   0,
+}
+
+const iconBtnStyle = {
+  background:    'none',
+  border:        'none',
+  cursor:        'pointer',
+  padding:       '3px',
+  color:         'var(--dt-text-faint)',
+  display:       'flex',
+  alignItems:    'center',
+  borderRadius:  '4px',
+  flexShrink:    0,
 }
 
 // ── Viewport-clamped drag ─────────────────────────────────────────────────────
@@ -211,8 +290,8 @@ function startDrag(e: MouseEvent) {
   const startX = e.clientX - pos.value.x
   const startY = e.clientY - pos.value.y
   const onMove = (ev: MouseEvent) => {
-    const w = panelRef.value?.offsetWidth  ?? 380
-    const h = panelRef.value?.offsetHeight ?? (collapsed.value ? 38 : 420)
+    const w = panelRef.value?.offsetWidth  ?? 400
+    const h = panelRef.value?.offsetHeight ?? (collapsed.value ? 40 : 440)
     pos.value = {
       x: Math.max(0, Math.min(ev.clientX - startX, window.innerWidth  - w)),
       y: Math.max(0, Math.min(ev.clientY - startY, window.innerHeight - h)),
@@ -338,15 +417,18 @@ function resetAllGroups() {
 
     <!-- ── Header ── -->
     <div :style="headerStyle" @mousedown="startDrag">
-      <span style="font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#6b7280">
-        🚩 {{ props.title }}
-      </span>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div style="display:flex;align-items:center;gap:7px">
+        <DtIcon name="flag" style="color:var(--dt-accent);flex-shrink:0" />
+        <span style="font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dt-text-muted)">
+          {{ props.title }}
+        </span>
+      </div>
+      <div style="display:flex;gap:2px;align-items:center">
         <span :style="statusStyle">{{ statusText }}</span>
-        <button
-          style="background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;display:flex;align-items:center"
-          @click="collapsed = !collapsed"
-        >
+        <button :style="iconBtnStyle" title="Toggle theme" @click="toggleTheme">
+          <DtIcon :name="effectiveTheme === 'dark' ? 'sun' : 'moon'" />
+        </button>
+        <button :style="iconBtnStyle" @click="collapsed = !collapsed">
           <DtIcon name="chevron-down" :style="chevronStyle" />
         </button>
       </div>
@@ -355,42 +437,37 @@ function resetAllGroups() {
     <template v-if="!collapsed">
 
       <!-- ── Tab bar ── -->
-      <div style="display:flex;background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:0 8px">
+      <div style="display:flex;gap:2px;padding:6px 10px;background:var(--dt-bg-subtle);border-bottom:1px solid var(--dt-border)">
         <button
           v-for="tab in tabDefs"
           :key="tab.key"
           :style="tabStyle(tab.key)"
           @click="activeTab = tab.key"
-        >{{ tab.label }}{{ tab.badge > 0 ? ` ${tab.badge}` : '' }}</button>
+        >
+          <DtIcon :name="tab.icon" />
+          {{ tab.label }}
+          <span v-if="tab.badge > 0" :style="tabBadgeStyle(tab.key)">{{ tab.badge }}</span>
+        </button>
       </div>
 
-      <!-- ════════════════════════════════════════════════════════════════════ -->
-      <!-- FLAGS TAB                                                           -->
-      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════════════════════════════════════════════ -->
+      <!-- FLAGS TAB                                                             -->
+      <!-- ══════════════════════════════════════════════════════════════════════ -->
       <template v-if="activeTab === 'flags'">
 
         <!-- Toolbar -->
-        <div style="display:flex;gap:6px;padding:6px 10px;border-bottom:1px solid #f3f4f6;align-items:center">
-          <input
-            type="text"
-            placeholder="🔍 search…"
-            :value="searchQuery"
-            @input="searchQuery = ($event.target as HTMLInputElement).value"
-            style="flex:1;padding:3px 7px;border-radius:4px;border:1px solid #e5e7eb;font-size:11px;outline:none;background:#fafafa"
+        <div style="display:flex;gap:6px;padding:7px 10px;border-bottom:1px solid var(--dt-border);align-items:center">
+          <DtSearch v-model="searchQuery" placeholder="Search flags…" />
+          <DtSelect
+            :model-value="sourceFilter"
+            :options="sourceOptions"
+            @update:model-value="sourceFilter = $event as FlagSource | ''"
           />
-          <select
-            :value="sourceFilter"
-            @change="sourceFilter = ($event.target as HTMLSelectElement).value as FlagSource | ''"
-            style="padding:3px 5px;border-radius:4px;border:1px solid #e5e7eb;font-size:10px;background:#fafafa;cursor:pointer"
-          >
-            <option value="">all</option>
-            <option v-for="s in ALL_SOURCES" :key="s" :value="s">{{ s }}</option>
-          </select>
         </div>
 
         <!-- Flag list -->
         <div style="overflow-y:auto;flex:1">
-          <div v-if="flagEntries.length === 0" style="padding:16px;color:#9ca3af;font-size:11px;text-align:center">
+          <div v-if="flagEntries.length === 0" style="padding:20px 16px;color:var(--dt-text-faint);font-size:11px;text-align:center">
             No flags match.
           </div>
           <template v-for="entry in flagEntries" :key="entry.name">
@@ -416,12 +493,11 @@ function resetAllGroups() {
 
         <!-- Flags footer -->
         <div :style="footerStyle">
-          <!-- Profiles row -->
           <div v-if="profileNames.length > 0" style="display:flex;gap:5px;margin-bottom:6px;align-items:center">
             <select
               value=""
               @change="onLoadProfile($event)"
-              style="flex:1;padding:3px 6px;border-radius:4px;border:1px solid #d1d5db;background:#fff;font-size:11px;cursor:pointer"
+              style="flex:1;padding:3px 6px;border-radius:5px;border:1px solid var(--dt-border-strong);background:var(--dt-bg);color:var(--dt-text);font-size:11px;cursor:pointer"
             >
               <option value="" disabled>Load profile…</option>
               <option value="default">⟲ default</option>
@@ -433,14 +509,15 @@ function resetAllGroups() {
               :value="newProfileName"
               @input="newProfileName = ($event.target as HTMLInputElement).value"
               @keydown.enter="saveProfile"
-              style="width:90px;padding:3px 5px;border-radius:4px;border:1px solid #d1d5db;font-size:10px;outline:none"
+              style="width:90px;padding:3px 5px;border-radius:5px;border:1px solid var(--dt-border-strong);font-size:10px;outline:none;background:var(--dt-bg);color:var(--dt-text)"
             />
             <DtButton @click="saveProfile">Save</DtButton>
           </div>
-          <!-- Action buttons -->
+          <div style="display:flex;gap:5px;margin-bottom:5px">
+            <DtButton :flex="true" variant="danger" @click="provider.resetAll()">Reset all</DtButton>
+            <DtButton title="Reload from loader" @click="provider.reload()" style="font-size:14px;line-height:1">↺</DtButton>
+          </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <DtButton :flex="true" @click="provider.resetAll()">Reset all</DtButton>
-            <DtButton title="Reload from loader" @click="provider.reload()">↺</DtButton>
             <DtButton @click="copyUrl">{{ copyLabel }}</DtButton>
             <DtButton title="Copy overrides as JSON" @click="exportOverrides">
               <DtIcon name="export" /> export
@@ -449,13 +526,12 @@ function resetAllGroups() {
               <DtIcon name="import" /> import
             </DtButton>
           </div>
-          <!-- Import section -->
           <div v-if="showImport" style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
             <textarea
               placeholder='{"flagName": true, "variant": "v2"}'
               :value="importJson"
               @input="importJson = ($event.target as HTMLTextAreaElement).value"
-              style="width:100%;height:54px;padding:4px;border-radius:4px;border:1px solid #d1d5db;font-size:10px;font-family:ui-monospace;resize:vertical;box-sizing:border-box"
+              style="width:100%;height:54px;padding:4px;border-radius:5px;border:1px solid var(--dt-border-strong);font-size:10px;font-family:ui-monospace;resize:vertical;box-sizing:border-box;background:var(--dt-bg);color:var(--dt-text)"
             />
             <div style="display:flex;gap:4px">
               <DtButton :flex="true" @click="applyImport">Apply</DtButton>
@@ -465,14 +541,14 @@ function resetAllGroups() {
         </div>
       </template>
 
-      <!-- ════════════════════════════════════════════════════════════════════ -->
-      <!-- GROUPS TAB                                                          -->
-      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════════════════════════════════════════════ -->
+      <!-- GROUPS TAB                                                            -->
+      <!-- ══════════════════════════════════════════════════════════════════════ -->
       <template v-else-if="activeTab === 'groups'">
         <div style="overflow-y:auto;flex:1">
-          <div v-if="groupEntries.length === 0" style="padding:24px 16px;color:#9ca3af;font-size:11px;text-align:center">
-            <div>○ No groups configured.</div>
-            <div style="margin-top:4px;font-size:10px">Add groups in your FeatureToggles options.</div>
+          <div v-if="groupEntries.length === 0" style="padding:28px 16px;color:var(--dt-text-faint);font-size:11px;text-align:center">
+            <div>No groups configured.</div>
+            <div style="margin-top:4px;font-size:10px;color:var(--dt-text-faint)">Add groups in your FeatureToggles options.</div>
           </div>
           <DtGroupRow
             v-for="g in groupEntries"
@@ -490,19 +566,20 @@ function resetAllGroups() {
         <div :style="footerStyle">
           <DtButton
             :flex="true"
+            variant="danger"
             :disabled="groupEntries.length === 0"
             @click="resetAllGroups"
           >Reset all groups</DtButton>
         </div>
       </template>
 
-      <!-- ════════════════════════════════════════════════════════════════════ -->
-      <!-- HISTORY TAB                                                         -->
-      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════════════════════════════════════════════ -->
+      <!-- HISTORY TAB                                                           -->
+      <!-- ══════════════════════════════════════════════════════════════════════ -->
       <template v-else>
         <div style="overflow-y:auto;flex:1">
-          <div v-if="history.length === 0" style="padding:24px 16px;color:#9ca3af;font-size:11px;text-align:center">
-            ○ No flag changes recorded yet.
+          <div v-if="history.length === 0" style="padding:28px 16px;color:var(--dt-text-faint);font-size:11px;text-align:center">
+            No flag changes recorded yet.
           </div>
           <DtHistoryRow
             v-for="(e, i) in history"
@@ -516,7 +593,7 @@ function resetAllGroups() {
         <div :style="footerStyle">
           <div style="display:flex;gap:5px;align-items:center">
             <DtButton @click="history = []">Clear</DtButton>
-            <span style="font-size:10px;color:#9ca3af">{{ history.length }} / 20</span>
+            <span style="font-size:10px;color:var(--dt-text-faint)">{{ history.length }} / 20</span>
           </div>
         </div>
       </template>

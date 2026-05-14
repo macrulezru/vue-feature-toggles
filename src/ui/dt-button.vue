@@ -18,13 +18,13 @@ const props = defineProps<{
 
 const style = computed(() => {
   const padding =
-    props.size === 'xs' ? '1px 5px' :
-    props.size === 'sm' ? '2px 6px' :
-                          '4px 8px'
+    props.size === 'xs' ? '2px 6px' :
+    props.size === 'sm' ? '3px 7px' :
+                          '5px 10px'
 
   const base = {
     padding,
-    borderRadius: '3px',
+    borderRadius: '6px',
     cursor:       props.disabled ? 'not-allowed' : 'pointer',
     fontSize:     '11px',
     lineHeight:   1,
@@ -32,25 +32,26 @@ const style = computed(() => {
     display:      'inline-flex',
     alignItems:   'center',
     gap:          '4px',
-    opacity:      props.disabled ? 0.5 : 1,
+    opacity:      props.disabled ? 0.45 : 1,
     whiteSpace:   'nowrap' as const,
+    transition:   'opacity .15s',
     ...(props.flex ? { flex: 1, justifyContent: 'center' } : {}),
   }
 
   if (props.variant === 'danger') {
-    return { ...base, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626' }
+    return { ...base, border: '1px solid var(--dt-danger)', background: 'var(--dt-danger-bg)', color: 'var(--dt-danger)' }
   }
   if (props.variant === 'success') {
-    return { ...base, border: '1px solid #86efac', background: '#fff', color: '#166534' }
+    return { ...base, border: '1px solid var(--dt-success)', background: 'var(--dt-success-bg)', color: 'var(--dt-success)' }
   }
   if (props.variant === 'primary') {
-    return { ...base, border: '1px solid #c4b5fd', background: props.active ? '#ede9fe' : '#fff', color: '#5b21b6' }
+    return { ...base, border: '1px solid var(--dt-accent)', background: props.active ? 'var(--dt-accent-bg)' : 'var(--dt-bg)', color: 'var(--dt-accent)' }
   }
   return {
     ...base,
-    border:     '1px solid #d1d5db',
-    background: props.active ? '#ede9fe' : '#fff',
-    color:      props.active ? '#5b21b6' : '#374151',
+    border:     '1px solid var(--dt-border-strong)',
+    background: props.active ? 'var(--dt-accent-bg)' : 'var(--dt-bg)',
+    color:      props.active ? 'var(--dt-accent)' : 'var(--dt-text)',
   }
 })
 </script>

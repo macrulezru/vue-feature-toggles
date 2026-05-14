@@ -22,10 +22,11 @@ defineEmits<{ 'update:modelValue': [val: boolean] }>()
       border:     'none',
       padding:    0,
       cursor:     disabled ? 'not-allowed' : 'pointer',
-      background: modelValue ? '#10b981' : '#d1d5db',
+      background: modelValue ? 'var(--dt-toggle-on)' : 'var(--dt-toggle-off)',
       transition: 'background .15s',
       flexShrink: 0,
       outline:    'none',
+      opacity:    disabled ? 0.45 : 1,
     }"
     @click="$emit('update:modelValue', !modelValue)"
   >
