@@ -10,6 +10,16 @@ export const SOURCE_STYLES: Record<FlagSource, { bg: string; color: string }> = 
   default:  { bg: '#f9fafb', color: '#9ca3af' },
 }
 
+export const SOURCE_STYLES_DARK: Record<FlagSource, { bg: string; color: string }> = {
+  url:      { bg: '#1e3a5f', color: '#93c5fd' },
+  runtime:  { bg: '#431407', color: '#fdba74' },
+  rules:    { bg: '#14532d', color: '#86efac' },
+  loader:   { bg: '#2e1065', color: '#c4b5fd' },
+  static:   { bg: '#3f3f46', color: '#d4d4d8' },
+  schedule: { bg: '#451a03', color: '#fde68a' },
+  default:  { bg: '#27272a', color: '#71717a' },
+}
+
 export const ALL_SOURCES: FlagSource[] = ['url', 'runtime', 'rules', 'loader', 'static', 'default']
 
 export interface FlagEntry {
