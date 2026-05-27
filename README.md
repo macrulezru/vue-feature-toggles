@@ -4,20 +4,105 @@
   </h1>
   <img
     src="https://s3.twcstorage.ru/c9a2cc89-780f97fd-311d-4a1a-b86f-c25665c9dc46/images/npm/vue-feature-toggles.webp"
-    alt="vue-virtual-scroller-kit"
+    alt="vue-feature-toggles"
     style="max-width:100%;width:auto;height:300px;border-radius:12px"
   />
 </div>
 
-**Lightweight, backend-agnostic feature flags plugin for Vue 3.**
+Lightweight, backend-agnostic feature flags plugin for Vue 3 — boolean and multivariate flags, contextual rules, URL overrides, live updates, SSR hydration, a DevTools overlay, and a CLI — with a single peer dependency.
+
+---
+
+## Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Demo](#demo)
+- [Quick start](#quick-start)
+- [Initialization options](#initialization-options)
+- [`<Feature>` component](#feature-component)
+- [`v-feature` directive](#v-feature-directive)
+- [`useFeature`](#usefeature)
+- [Multivariate flags](#multivariate-flags--featurevariant)
+- [`useFeatureProvider`](#usefeatureprovider)
+- [Feature variables](#feature-variables)
+- [Flag groups](#flag-groups)
+- [Flag dependencies](#flag-dependencies)
+- [Contextual rules](#contextual-rules)
+- [URL overrides](#url-overrides)
+- [Persistent overrides](#persistent-overrides)
+- [Override profiles](#override-profiles)
+- [SSR / Hydration](#ssr--hydration)
+- [Live updates](#live-updates-sse--websocket)
+- [Flag metadata & expiry](#flag-metadata--expiry)
+- [Type safety](#type-safety)
+- [`<FeatureDevTools>` panel](#featuredevtools-panel)
+- [Vue DevTools integration](#vue-devtools-integration)
+- [Nuxt module](#nuxt-module)
+- [Testing utilities](#testing-utilities)
+- [Storybook addon](#storybook-addon)
+- [CLI](#cli)
+- [Adapter loaders](#adapter-loaders)
+- [Vite plugin](#vite-plugin)
+- [TypeScript types](#typescript-types)
+- [Exports](#exports)
+- [Architecture](#architecture)
+- [Bundle size & peer dependencies](#bundle-size--peer-dependencies)
+
+---
+
+## Features
+
+- **`FeatureToggles` plugin** — Vue plugin with static flags, async loader, polling interval, URL overrides, SSR state, and live updates in one `app.use()` call
+- **`<Feature>` component** — conditional rendering via default / fallback / loading slots; inverted mode; group checks; optional HTML wrapper tag
+- **`v-feature` directive** — `v-show`-style toggle (`display: none`) for single flags, inverted flags, or AND checks across multiple flags
+- **`useFeature`** — composable returning reactive `Ref<boolean>` per flag or `Record<string, Ref<boolean>>` for multiple flags
+- **Multivariate flags** — string variants for A/B tests and rollouts; `useFeatureVariant` composable; `<FeatureVariant>` with named slots per variant
+- **`useFeatureProvider`** — full low-level API: `setFlag`, `resetFlag`, `reload`, `watchFlag`, groups, profiles, variables, dependencies, expiry, and more
+- **Contextual rules** — reactive functions evaluated as flag sources; priority below URL overrides and `setFlag`, above loader and static
+- **URL overrides** — query params override flags without a page reload; configurable prefix; works for boolean and variant flags and variables
+- **Persistent overrides** — `setFlag(..., { persist: true })` saves to `localStorage`; survives page reloads; `clearPersistedFlags()` for cleanup
+- **Override profiles** — named sets of overrides stored in `localStorage`; switchable from the DevTools panel; useful for QA and demos
+- **Flag groups** — `setGroup('beta', false)` toggles a whole group at once; `isGroupEnabled` is `true` only when all members are on
+- **Flag dependencies** — dependent flag forced off when its required flag is disabled; violations exposed via `getDependencyViolations()`
+- **Live updates** — SSE or WebSocket push; server sends only changed flags; automatic reconnect
+- **Flag metadata & expiry** — `description`, `owner`, `addedAt`, `ticket` per flag; automatic date-based expiry with dev-console warnings
+- **`<FeatureDevTools>`** — floating overlay with Flags / Groups / History tabs; search, filter by source, per-flag controls, variable editor, profile switcher; draggable, collapsible
+- **Vue DevTools integration** — optional `@vue/devtools-api`; inspector tab and timeline layer; loads dynamically, silently skips when absent
+- **Nuxt module** — global component registration, automatic SSR hydration via `nuxtApp.payload`, `$featureToggles` injection
+- **Testing utilities** — `withFeatures`, `createTestFeatureProvider`, `setTestFlag`, `resetTestProvider`; excluded from production bundle
+- **Storybook addon** — `withFeatureToggles` decorator with per-story `parameters.featureToggles`; excluded from production bundle
+- **Adapter loaders** — pre-built loaders for LaunchDarkly, Unleash, and Flagsmith
+- **Vite plugin** — strips `<FeatureDevTools>` from templates in production builds automatically
+- **CLI** — `list`, `check`, `stale` commands; reads config directly from source files; CI-safe exit codes
+- **Full TypeScript** — augment `FeatureFlagNames` interface for autocomplete and compile-time errors on flag names everywhere
 
 ---
 
 ## Installation
 
-```sh
+```bash
 npm install vue-feature-toggles
 ```
+
+Peer dependency:
+
+```bash
+npm install vue@>=3.0
+```
+
+---
+
+## Demo
+
+```bash
+git clone https://github.com/macrulezru/vue-feature-toggles.git
+cd vue-feature-toggles
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:5174`. The demo covers all three interfaces — component, directive, and composable — with runtime flag controls and URL override examples.
 
 ---
 
@@ -119,9 +204,7 @@ app.use(FeatureToggles, {
 
 ---
 
-## Interfaces
-
-### `<Feature>` component
+## `<Feature>` component
 
 ```vue
 <!-- Basic -->
@@ -163,7 +246,7 @@ app.use(FeatureToggles, {
 </Feature>
 ```
 
-#### Props
+### Props
 
 | Prop       | Type                  | Default | Description                                             |
 | ---------- | --------------------- | ------- | ------------------------------------------------------- |
@@ -173,17 +256,17 @@ app.use(FeatureToggles, {
 | `inverted` | `boolean`             | `false` | Render when the flag is `false`                         |
 | `tag`      | `string`              | —       | Wrap content in an HTML element (no wrapper by default) |
 
-#### Slots
+### Slots
 
-| Slot      | Description                                  |
-| --------- | -------------------------------------------- |
-| `default` | Content when the flag is on                  |
-| `fallback`| Content when the flag is off                 |
-| `loading` | Content while flags are loading via `loader` |
+| Slot       | Description                                  |
+| ---------- | -------------------------------------------- |
+| `default`  | Content when the flag is on                  |
+| `fallback` | Content when the flag is off                 |
+| `loading`  | Content while flags are loading via `loader` |
 
 ---
 
-### `v-feature` directive
+## `v-feature` directive
 
 ```vue
 <!-- Show when flag is on -->
@@ -200,7 +283,7 @@ Works like `v-show` (toggles `display: none`) — the DOM node is always present
 
 ---
 
-### `useFeature` composable
+## `useFeature`
 
 ```ts
 import { useFeature } from 'vue-feature-toggles'
@@ -217,7 +300,7 @@ const allEnabled = useFeature('newDashboard', 'betaSearch')
 
 ---
 
-### Multivariate flags & `<FeatureVariant>`
+## Multivariate flags & `<FeatureVariant>`
 
 Flags can hold a string variant instead of a boolean — useful for A/B tests and multi-step rollouts.
 
@@ -245,7 +328,9 @@ URL overrides work identically: `?feature:checkoutFlow=v2`.
 
 ---
 
-### `useFeatureProvider` — full provider access
+## `useFeatureProvider`
+
+Full access to the provider internals — use for imperative flag control, observability, and advanced integrations.
 
 ```ts
 import { useFeatureProvider } from 'vue-feature-toggles'
@@ -257,11 +342,11 @@ const {
   isReady,    // Ref<boolean> — true after first load
 
   // Boolean flags
-  isEnabled,  // (name) => boolean
-  setFlag,    // (name, value, options?) => void
-  resetFlag,  // (name) => void
-  resetAll,   // () => void
-  reload,     // () => Promise<void>
+  isEnabled,     // (name) => boolean
+  setFlag,       // (name, value, options?) => void
+  resetFlag,     // (name) => void
+  resetAll,      // () => void
+  reload,        // () => Promise<void>
   getFlagSource, // (name) => FlagSource
 
   // Variant flags
@@ -286,7 +371,7 @@ const {
   listProfiles, // () => string[]
 
   // Persistence
-  isPersisted,        // (name) => boolean
+  isPersisted,         // (name) => boolean
   clearPersistedFlags, // () => void
 
   // Metadata & expiry
@@ -310,7 +395,7 @@ const {
 } = useFeatureProvider()
 ```
 
-#### Common patterns
+### Common patterns
 
 ```ts
 // Emergency kill-switch
@@ -445,7 +530,7 @@ Custom prefix (`urlPrefix: 'ft'`):
 ?ft:newDashboard=true
 ```
 
-#### Priority order (highest → lowest)
+### Priority order (highest → lowest)
 
 ```
 URL override → runtime setFlag() → rules → loader → static flags → defaultValue
@@ -618,7 +703,7 @@ const isDev = import.meta.env.DEV
 
 The panel is organized into three tabs, each with its own content and action buttons.
 
-#### Flags tab
+### Flags tab
 
 The default view — lists every known flag with full controls.
 
@@ -631,28 +716,28 @@ The default view — lists every known flag with full controls.
 - **Toggle** boolean flags on/off with a single click
 - **Edit variant** — click the variant badge to edit inline; confirm with Enter or ✓
 - **Reset** any individual runtime or URL override back to its original source
-- **Variables** — flags with `variables` configured show a `▸ N` expand button; click to reveal per-variable inputs where you can read and change values in place
+- **Variables** — flags with `variables` configured show a `▸ N` expand button; click to reveal per-variable inputs
 - **Footer actions**: Reset all · Reload from loader · Copy URL · Export overrides as JSON · Import overrides from JSON
-- **Profiles** — if saved profiles exist, a dropdown lets you switch between them instantly; a name input + Save button lets you snapshot the current flag state as a new profile
+- **Profiles** — if saved profiles exist, a dropdown lets you switch between them instantly
 
-#### Groups tab
+### Groups tab
 
 Shows every group defined in the `groups` option.
 
-- Each group row displays the group name, an `N/M` enabled counter, an `ALL ON / PARTIAL` status badge, and **ON / OFF / reset** buttons that affect all members at once
-- Member flags are shown as colored chips (green = enabled, grey = disabled)
+- Each group row displays: group name, `N/M` enabled counter, `ALL ON / PARTIAL` status badge, and **ON / OFF / reset** buttons
+- Member flags shown as colored chips (green = enabled, grey = disabled)
 - **Footer**: Reset all groups
 
-#### History tab
+### History tab
 
 A chronological log of the last 20 flag changes recorded during the session.
 
 - Each entry shows: timestamp, flag name, source badge, new value badge
 - **Footer**: Clear
 
-#### General
+### General
 
-- **Draggable** — drag by the header; the widget is viewport-clamped so it can never leave the screen; position is saved in `sessionStorage` across page reloads
+- **Draggable** — drag by the header; viewport-clamped; position saved in `sessionStorage`
 - **Collapsible** — collapse to a title bar with the chevron button
 
 ---
@@ -661,7 +746,7 @@ A chronological log of the last 20 flag changes recorded during the session.
 
 A custom inspector tab and timeline layer appear in the browser Vue DevTools extension when `@vue/devtools-api` is installed.
 
-```sh
+```bash
 npm install --save-dev @vue/devtools-api
 ```
 
@@ -708,7 +793,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 })
 ```
 
-#### Custom loader with Nuxt
+### Custom loader with Nuxt
 
 The `loader` option is a function and cannot be serialized in `nuxt.config`. Use a plugin instead:
 
@@ -730,15 +815,11 @@ export default defineNuxtPlugin((nuxtApp) => {
 
 ## Testing utilities
 
-```sh
-# No extra install needed — included in vue-feature-toggles
-```
-
 ```ts
 import { createTestFeatureProvider, withFeatures, setTestFlag, resetTestProvider } from 'vue-feature-toggles/testing'
 ```
 
-#### Mount with flags
+### Mount with flags
 
 ```ts
 import { mount } from '@vue/test-utils'
@@ -750,7 +831,7 @@ const wrapper = mount(MyComponent, withFeatures({
 }))
 ```
 
-#### Full provider access in tests
+### Full provider access in tests
 
 ```ts
 import { createTestFeatureProvider } from 'vue-feature-toggles/testing'
@@ -765,7 +846,7 @@ provider.setFlag('newDashboard', false)
 await nextTick()
 ```
 
-#### Change flags mid-test
+### Change flags mid-test
 
 ```ts
 import { setTestFlag } from 'vue-feature-toggles/testing'
@@ -779,7 +860,7 @@ it('hides the component when flag is off', async () => {
 })
 ```
 
-#### Cleanup
+### Cleanup
 
 ```ts
 import { resetTestProvider } from 'vue-feature-toggles/testing'
@@ -820,7 +901,7 @@ Per-story `parameters.featureToggles` are merged on top of the global defaults. 
 
 ## CLI
 
-```sh
+```bash
 npx vue-feature-toggles <command> [options]
 ```
 
@@ -847,9 +928,9 @@ export default {
 }
 ```
 
-#### `list` — show all flags
+### `list` — show all flags
 
-```sh
+```bash
 npx vue-feature-toggles list
 ```
 
@@ -864,9 +945,9 @@ checkoutFlow     v1     static  checkout   2025-09-01
 christmasBanner  true   static  marketing  2024-11-01  [EXPIRED]
 ```
 
-#### `check` — find unknown flag references
+### `check` — find unknown flag references
 
-```sh
+```bash
 npx vue-feature-toggles check
 npx vue-feature-toggles check ./src/features
 npx vue-feature-toggles check --src src/features
@@ -880,23 +961,23 @@ Scans `.ts`, `.tsx`, `.js`, `.jsx`, `.vue` files for `useFeature(...)`, `v-featu
 ❌ newCheckout  — unknown flag. Did you mean: checkoutFlow?
 ```
 
-#### `stale` — find flags overdue for cleanup
+### `stale` — find flags overdue for cleanup
 
-```sh
+```bash
 npx vue-feature-toggles stale
 npx vue-feature-toggles stale --months 6
 ```
 
 Reports boolean `true` flags whose `meta.addedAt` is older than `--months` (default: 3). These are candidates for removal — the feature has been live long enough that the flag is dead code.
 
-#### Global options
+### Global options
 
-| Option            | Default                             | Description                    |
-| ----------------- | ----------------------------------- | ------------------------------ |
-| `--config <path>` | *(scan source files)*               | Explicit config file override  |
-| `--root <path>`   | `.`                                 | Project root directory         |
-| `--src <path>`    | `src` *(check only)*                | Source directory to scan       |
-| `--months <n>`    | `3` *(stale only)*                  | Age threshold in months        |
+| Option            | Default              | Description                    |
+| ----------------- | -------------------- | ------------------------------ |
+| `--config <path>` | *(scan source files)* | Explicit config file override  |
+| `--root <path>`   | `.`                  | Project root directory         |
+| `--src <path>`    | `src` *(check only)* | Source directory to scan       |
+| `--months <n>`    | `3` *(stale only)*   | Age threshold in months        |
 
 ---
 
@@ -908,7 +989,7 @@ Pre-built loaders for common flag management services, imported from `vue-featur
 import { launchDarklyLoader, unleashLoader, flagsmithLoader } from 'vue-feature-toggles/adapters'
 ```
 
-#### LaunchDarkly
+### LaunchDarkly
 
 ```ts
 app.use(FeatureToggles, {
@@ -919,7 +1000,7 @@ app.use(FeatureToggles, {
 })
 ```
 
-#### Unleash
+### Unleash
 
 ```ts
 app.use(FeatureToggles, {
@@ -932,7 +1013,7 @@ app.use(FeatureToggles, {
 })
 ```
 
-#### Flagsmith
+### Flagsmith
 
 ```ts
 app.use(FeatureToggles, {
@@ -960,44 +1041,15 @@ export default defineConfig({
 })
 ```
 
-| Option           | Default | Description                                            |
-| ---------------- | ------- | ------------------------------------------------------ |
-| `stripDevTools`  | `true`  | Remove `<FeatureDevTools>` from templates in prod      |
+| Option          | Default | Description                                       |
+| --------------- | ------- | ------------------------------------------------- |
+| `stripDevTools` | `true`  | Remove `<FeatureDevTools>` from templates in prod |
 
 ---
 
-## Loader providers
+## TypeScript types
 
-The plugin is backend-agnostic — pass any async function as `loader`:
-
-```ts
-// REST API
-loader: async () => fetch('/api/flags').then(r => r.json())
-
-// LaunchDarkly
-loader: async () => {
-  const client = LDClient.initialize(envKey, user)
-  await client.waitUntilReady()
-  return client.allFlags()
-}
-
-// localStorage
-loader: async () => JSON.parse(localStorage.getItem('feature-flags') ?? '{}')
-
-// Role-based
-loader: async () => {
-  const user = await getUser()
-  return {
-    adminPanel:   user.role === 'admin',
-    betaFeature:  user.plan === 'pro',
-    newDashboard: true,
-  }
-}
-```
-
----
-
-## Types
+All public types are exported from the package root:
 
 ```ts
 import type {
@@ -1031,9 +1083,9 @@ interface SetFlagOptions {
 }
 
 interface LiveUpdatesOptions {
-  type:             'sse' | 'websocket'
-  url:              string
-  reconnectDelay?:  number  // ms, default: 3000
+  type:            'sse' | 'websocket'
+  url:             string
+  reconnectDelay?: number  // ms, default: 3000
 }
 
 // FlagName resolves to a union of your declared flag names when FeatureFlagNames is augmented,
@@ -1083,42 +1135,98 @@ import { featureTogglesPlugin } from 'vue-feature-toggles/vite'
 
 ---
 
-## Development
+## Architecture
 
-```sh
-npm run dev        # serve demo app with HMR
-npm run build      # build all entry points to dist/
-npm run typecheck  # TypeScript checks via vue-tsc
-npm test           # run tests once (vitest)
-npm run test:watch # run tests in watch mode
 ```
-
-Tests live in `src/__tests__/`. The suite covers helpers, rollout, persistence, the full provider priority chain, and all composables via `@vue/test-utils`.
-
-CI runs on every push and pull request to `master`: typecheck → build → test.
+vue-feature-toggles
+│
+├── FeatureProvider  (core singleton, created by the plugin)
+│     FlagStore        — Map<name, FlagValue>; reactive via shallowRef
+│     SourceIndex      — Map<name, FlagSource>; priority tier per flag
+│     VariableStore    — Map<flagName+varName, Ref<T>>
+│     ProfileStore     — reads/writes named snapshots to localStorage
+│
+├── Priority chain  (highest → lowest)
+│     UrlOverrideLayer   — reads query params on init; reactively updates via URLSearchParams
+│     RuntimeLayer       — setFlag() / setVariant() / setVariable(); persist option → localStorage
+│     RulesLayer         — watches reactive rule functions; re-evaluates when deps change
+│     LoaderLayer        — async loader; optional polling via setInterval; live update listener
+│     StaticLayer        — flags/variables from plugin options
+│     DefaultLayer       — defaultValue fallback
+│
+├── DependencyManager
+│     Computes forced-off flags when required flags are disabled
+│     Emits dev-console warnings on violation; exposes getDependencyViolations()
+│
+├── GroupManager
+│     setGroup() fans out to all member flags via RuntimeLayer
+│     isGroupEnabled() checks all members synchronously
+│
+├── ExpiryManager
+│     Compares meta.expiry dates against Date.now() on every isEnabled() call
+│     Expired flags return defaultValue; dev-console warning on first access
+│
+├── LiveUpdatesManager
+│     SSE — EventSource; auto-reconnect on error
+│     WebSocket — native WebSocket; configurable reconnectDelay
+│     Both merge the received partial flags object into LoaderLayer
+│
+├── <Feature> / <FeatureVariant>
+│     Inject FEATURE_PROVIDER_KEY; render via computed isEnabled / getVariant
+│     Loading slot shown while isLoading.value is true
+│
+├── v-feature directive
+│     beforeMount + updated hooks; sets el.style.display based on flag value
+│
+├── useFeature / useFeatureVariant
+│     Thin wrappers returning computed Refs from FeatureProvider
+│
+├── <FeatureDevTools>
+│     Three-tab overlay: Flags · Groups · History
+│     Draggable via mousedown + mousemove; position persisted in sessionStorage
+│     Reads/writes directly via useFeatureProvider()
+│
+├── DevTools integration  (optional @vue/devtools-api)
+│     Loaded dynamically; silently skips if package absent
+│     Inspector: all flags with source badges
+│     Timeline: flag change events with prev/next value
+│
+├── /testing  (separate entry point)
+│     createTestFeatureProvider — isolated FeatureProvider, no localStorage side-effects
+│     withFeatures — @vue/test-utils mount options shorthand
+│     setTestFlag — sets flag + awaits nextTick
+│     resetTestProvider — clears all runtime overrides
+│
+├── /storybook  (separate entry point)
+│     withFeatureToggles — Storybook decorator; merges story parameters on top of global defaults
+│
+├── /adapters  (separate entry point)
+│     launchDarklyLoader, unleashLoader, flagsmithLoader
+│     Each returns an async () => Record<string, FlagValue> compatible with the loader option
+│
+├── /vite  (separate entry point)
+│     featureTogglesPlugin — Vite transform that removes <FeatureDevTools> in production
+│
+└── /nuxt  (module)
+      Registers <Feature>, <FeatureVariant>, v-feature globally via addComponent / addDirective
+      Installs plugin via addPlugin with runtimeConfig.featureToggles
+      Handles SSR state via nuxtApp.payload (no ssrState config needed)
+```
 
 ---
 
-## Demo
+## Bundle size & peer dependencies
 
-```sh
-git clone https://github.com/macrulezru/vue-feature-toggles.git
-cd vue-feature-toggles
-npm install
-npm run dev
-```
+| Entry point                       | Peer deps              | Notes                                         |
+| --------------------------------- | ---------------------- | --------------------------------------------- |
+| `vue-feature-toggles`             | `vue ^3.0`             | Core — plugin, components, directive, composables |
+| `vue-feature-toggles/testing`     | `vue ^3.0`             | Test helpers only; excluded from prod bundle  |
+| `vue-feature-toggles/storybook`   | `vue ^3.0`             | Storybook decorator only; excluded from prod  |
+| `vue-feature-toggles/adapters`    | `vue ^3.0`             | LaunchDarkly, Unleash, Flagsmith loaders      |
+| `vue-feature-toggles/vite`        | `vite ^4`              | Vite transform plugin                         |
+| `vue-feature-toggles/nuxt`        | `vue ^3.0`, `@nuxt/kit` (optional peer) | Nuxt 3 module             |
 
-Opens at `http://localhost:5174`. The demo covers all three interfaces — component, directive, and composable — with runtime flag controls and URL override examples.
-
----
-
-## Requirements
-
-- Vue 3.0+
-- Node.js 18+
-- Modern browser with ES2020+ support
-- `@nuxt/kit` — required only when using the Nuxt module (included automatically with any Nuxt 3 installation)
-- `@vue/devtools-api` — optional, enables the Vue DevTools inspector/timeline integration
+The package ships as tree-shakeable ESM (`dist/*.js`) and CommonJS (`dist/*.cjs`). `@vue/devtools-api` is an optional peer dependency — the DevTools integration is loaded dynamically and silently skipped when the package is absent or when Vue DevTools are closed.
 
 ---
 
@@ -1132,7 +1240,7 @@ MIT
 
 Danil Lisin Vladimirovich aka Macrulez
 
-GitHub: [macrulezru](https://github.com/macrulezru) · Website: [macrulez.ru](https://macrulez.ru/)
+GitHub: [macrulezru](https://github.com/macrulezru) · Website: [macrulez.ru/en](https://macrulez.ru/en)
 
 Questions and bugs — [issues](https://github.com/macrulezru/vue-feature-toggles/issues)
 
