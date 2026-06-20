@@ -1,7 +1,28 @@
 {
   "name": "vue-feature-toggles",
-  "version": "0.1.13",
-  "description": "Lightweight, backend-agnostic feature flags plugin for Vue 3",
+  "version": "0.1.14",
+  "description": "Backend-agnostic feature flags for Vue 3 — boolean and multivariate flags, contextual rules, URL overrides, SSR hydration, DevTools and CLI.",
+  "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
+  "license": "MIT",
+  "homepage": "https://github.com/macrulezru/vue-feature-toggles#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/macrulezru/vue-feature-toggles.git"
+  },
+  "bugs": {
+    "url": "https://github.com/macrulezru/vue-feature-toggles/issues"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "feature-flags",
+    "feature-toggles",
+    "ab-testing",
+    "multivariate",
+    "ssr",
+    "devtools",
+    "typescript"
+  ],
   "type": "module",
   "main": "./dist/vue-feature-toggles.cjs",
   "module": "./dist/vue-feature-toggles.js",
@@ -37,9 +58,15 @@
     "dist",
     "nuxt",
     "bin",
-    "src/vite.ts"
+    "src/vite.ts",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
+    "prepublishOnly": "npm run build",
     "dev": "vite serve demo --config demo/vite.config.ts",
     "build": "vite build",
     "build:demo": "vite build --config demo/vite.config.ts",
@@ -48,7 +75,9 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "vue": "^3.0.0"
+    "vue": "^3.0.0",
+    "@nuxt/kit": ">=3.0.0",
+    "@vue/devtools-api": ">=7.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
