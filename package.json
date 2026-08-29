@@ -1,10 +1,10 @@
 {
   "name": "vue-feature-toggles",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Backend-agnostic feature flags for Vue 3 — boolean and multivariate flags, contextual rules, URL overrides, SSR hydration, DevTools and CLI.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
-  "homepage": "https://github.com/macrulezru/vue-feature-toggles#readme",
+  "homepage": "https://npm.vuecraft.ru/en/packages/vue-feature-toggles/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/macrulezru/vue-feature-toggles.git"
