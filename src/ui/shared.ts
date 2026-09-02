@@ -20,7 +20,7 @@ export const SOURCE_STYLES_DARK: Record<FlagSource, { bg: string; color: string 
   default:  { bg: '#27272a', color: '#71717a' },
 }
 
-export const ALL_SOURCES: FlagSource[] = ['url', 'runtime', 'rules', 'loader', 'static', 'default']
+export const ALL_SOURCES: FlagSource[] = ['url', 'runtime', 'rules', 'loader', 'static', 'schedule', 'default']
 
 export interface FlagEntry {
   name: string

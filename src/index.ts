@@ -5,6 +5,7 @@ export { default as FeatureDevTools } from './components/feature-dev-tools.vue'
 export { vFeature } from './directives/vFeature'
 export { useFeature, useFeatureVariant } from './composables/useFeature'
 export { useFeatureProvider } from './composables/useFeatureProvider'
+export { FEATURE_PROVIDER_KEY } from './core/FeatureProvider'
 export { serializeFlags } from './ssr'
 export type {
   FeatureTogglesOptions,

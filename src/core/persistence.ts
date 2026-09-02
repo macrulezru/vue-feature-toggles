@@ -3,7 +3,7 @@ import type { FlagValue } from './types'
 export const PERSIST_KEY  = 'vue-feature-toggles:overrides'
 export const PROFILES_KEY = 'vue-feature-toggles:profiles'
 
-export function loadPersistedOverrides(): Record<string, boolean> {
+export function loadPersistedOverrides(): Record<string, FlagValue> {
   if (typeof localStorage === 'undefined') return {}
   try {
     return JSON.parse(localStorage.getItem(PERSIST_KEY) || '{}')
@@ -12,7 +12,7 @@ export function loadPersistedOverrides(): Record<string, boolean> {
   }
 }
 
-export function savePersistedOverrides(data: Record<string, boolean>): void {
+export function savePersistedOverrides(data: Record<string, FlagValue>): void {
   if (typeof localStorage === 'undefined') return
   try { localStorage.setItem(PERSIST_KEY, JSON.stringify(data)) } catch {}
 }

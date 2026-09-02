@@ -125,6 +125,38 @@ describe('variants', () => {
     p.setVariant('ui', 'v2')
     expect(p.getVariant('ui')).toBe('v2')
   })
+
+  it('setVariant persist: true writes to localStorage', () => {
+    const p = createFeatureProvider({ flags: { ui: 'v1' } })
+    p.setVariant('ui', 'v2', { persist: true })
+    expect(JSON.parse(localStorage.getItem(PERSIST_KEY)!)).toEqual({ ui: 'v2' })
+    expect(p.isPersisted('ui')).toBe(true)
+  })
+
+  it('resetFlag removes a persisted variant from localStorage', () => {
+    const p = createFeatureProvider({ flags: { ui: 'v1' } })
+    p.setVariant('ui', 'v2', { persist: true })
+    p.resetFlag('ui')
+    expect(JSON.parse(localStorage.getItem(PERSIST_KEY)!)).toEqual({})
+    expect(p.isPersisted('ui')).toBe(false)
+    expect(p.getVariant('ui')).toBe('v1')
+  })
+
+  it('a persisted variant survives a fresh provider instance', () => {
+    const p1 = createFeatureProvider({ flags: { ui: 'v1' } })
+    p1.setVariant('ui', 'v2', { persist: true })
+
+    const p2 = createFeatureProvider({ flags: { ui: 'v1' } })
+    expect(p2.getVariant('ui')).toBe('v2')
+    expect(p2.isPersisted('ui')).toBe(true)
+  })
+
+  it('persisted boolean and variant overrides coexist in the same storage entry', () => {
+    const p = createFeatureProvider({ flags: { feat: false, ui: 'v1' } })
+    p.setFlag('feat', true, { persist: true })
+    p.setVariant('ui', 'v2', { persist: true })
+    expect(JSON.parse(localStorage.getItem(PERSIST_KEY)!)).toEqual({ feat: true, ui: 'v2' })
+  })
 })
 
 // ---------------------------------------------------------------------------

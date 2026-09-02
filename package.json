@@ -1,6 +1,6 @@
 {
   "name": "vue-feature-toggles",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Backend-agnostic feature flags for Vue 3 — boolean and multivariate flags, contextual rules, URL overrides, SSR hydration, DevTools and CLI.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
@@ -34,18 +34,22 @@
       "require": "./dist/vue-feature-toggles.cjs"
     },
     "./testing": {
+      "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js",
       "require": "./dist/testing.cjs"
     },
     "./storybook": {
+      "types": "./dist/storybook.d.ts",
       "import": "./dist/storybook.js",
       "require": "./dist/storybook.cjs"
     },
     "./adapters": {
+      "types": "./dist/adapters.d.ts",
       "import": "./dist/adapters.js",
       "require": "./dist/adapters.cjs"
     },
     "./vite": {
+      "types": "./dist/vite.d.ts",
       "import": "./dist/vite.js",
       "require": "./dist/vite.cjs"
     },
@@ -75,9 +79,9 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "vue": "^3.0.0",
     "@nuxt/kit": ">=3.0.0",
-    "@vue/devtools-api": ">=7.0.0"
+    "@vue/devtools-api": ">=7.0.0",
+    "vue": "^3.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -97,6 +101,7 @@
     "happy-dom": "^20.9.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
+    "vite-plugin-dts": "^5.1.0",
     "vitest": "^4.1.6",
     "vue": "^3.5.13",
     "vue-tsc": "^2.2.8"
