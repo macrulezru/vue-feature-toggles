@@ -225,31 +225,37 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     return typeof val === 'string' ? val : ''
   }
 
-  const setVariant = (name: string, variant: string): void => {
+  // Rebuild the persisted-overrides snapshot from the current set of persisted
+  // keys + live runtimeOverrides values, and write it to storage.
+  const syncPersistedOverrides = (keys: Set<string>): void => {
+    const toSave: Record<string, FlagValue> = {}
+    for (const k of keys) {
+      const v = runtimeOverrides.value[k]
+      if (typeof v === 'boolean' || typeof v === 'string') toSave[k] = v
+    }
+    savePersistedOverrides(toSave)
+  }
+
+  const setVariant = (name: string, variant: string, opts: SetFlagOptions = {}): void => {
     runtimeOverrides.value = { ...runtimeOverrides.value, [name]: variant }
+    if (opts.persist) {
+      persistedKeys.value = new Set([...persistedKeys.value, name])
+      syncPersistedOverrides(persistedKeys.value)
+    } else if (persistedKeys.value.has(name)) {
+      persistedKeys.value = new Set([...persistedKeys.value].filter(k => k !== name))
+      syncPersistedOverrides(persistedKeys.value)
+    }
   }
 
   // ── setFlag / resetFlag / resetAll ─────────────────────────────────────────
   const setFlag = (name: string, value: boolean, opts: SetFlagOptions = {}): void => {
     runtimeOverrides.value = { ...runtimeOverrides.value, [name]: value }
     if (opts.persist) {
-      const next = new Set([...persistedKeys.value, name])
-      persistedKeys.value = next
-      const toSave: Record<string, boolean> = {}
-      for (const k of next) {
-        const v = k === name ? value : runtimeOverrides.value[k]
-        if (typeof v === 'boolean') toSave[k] = v
-      }
-      savePersistedOverrides(toSave)
+      persistedKeys.value = new Set([...persistedKeys.value, name])
+      syncPersistedOverrides(persistedKeys.value)
     } else if (persistedKeys.value.has(name)) {
-      const next = new Set([...persistedKeys.value].filter(k => k !== name))
-      persistedKeys.value = next
-      const toSave: Record<string, boolean> = {}
-      for (const k of next) {
-        const v = runtimeOverrides.value[k]
-        if (typeof v === 'boolean') toSave[k] = v
-      }
-      savePersistedOverrides(toSave)
+      persistedKeys.value = new Set([...persistedKeys.value].filter(k => k !== name))
+      syncPersistedOverrides(persistedKeys.value)
     }
   }
 
@@ -257,14 +263,8 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     const { [name]: _, ...rest } = runtimeOverrides.value
     runtimeOverrides.value = rest
     if (persistedKeys.value.has(name)) {
-      const next = new Set([...persistedKeys.value].filter(k => k !== name))
-      persistedKeys.value = next
-      const toSave: Record<string, boolean> = {}
-      for (const k of next) {
-        const v = runtimeOverrides.value[k]
-        if (typeof v === 'boolean') toSave[k] = v
-      }
-      savePersistedOverrides(toSave)
+      persistedKeys.value = new Set([...persistedKeys.value].filter(k => k !== name))
+      syncPersistedOverrides(persistedKeys.value)
     }
   }
 

@@ -135,7 +135,7 @@ export interface FeatureProvider {
 
   // Variant flags
   getVariant: (name: string) => string
-  setVariant: (name: string, variant: string) => void
+  setVariant: (name: string, variant: string, options?: SetFlagOptions) => void
 
   // Variables
   getVariable: <T = unknown>(flagName: string, varName: string) => Ref<T>

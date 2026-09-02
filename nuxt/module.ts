@@ -1,7 +1,10 @@
 import { defineNuxtModule, addPlugin, createResolver } from '@nuxt/kit'
 import type { FeatureTogglesOptions } from '../src/core/types'
 
-export type NuxtFeatureTogglesOptions = Omit<FeatureTogglesOptions, 'loader' | 'ssrState'>
+// `loader` and `rules` are function-valued and cannot survive JSON serialization
+// into `runtimeConfig.public` — register them via a custom Nuxt plugin instead.
+// `ssrState` is populated automatically from the SSR payload at runtime.
+export type NuxtFeatureTogglesOptions = Omit<FeatureTogglesOptions, 'loader' | 'rules' | 'ssrState'>
 
 declare module '@nuxt/schema' {
   interface NuxtConfig {
@@ -38,6 +41,9 @@ export default defineNuxtModule<NuxtFeatureTogglesOptions>({
       ...(options.dependencies ? { dependencies: options.dependencies } : {}),
       ...(options.meta         ? { meta: options.meta }                 : {}),
       ...(options.expiry       ? { expiry: options.expiry }             : {}),
+      ...(options.schedule     ? { schedule: options.schedule }         : {}),
+      ...(options.variables    ? { variables: options.variables }       : {}),
+      ...(options.userId       ? { userId: options.userId }             : {}),
     }
 
     const resolver = createResolver(import.meta.url)
