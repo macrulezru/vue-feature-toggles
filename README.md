@@ -78,6 +78,68 @@ app.mount('#app')
 </Feature>
 ```
 
+### More examples
+
+#### A flag decided by context, not hardcoded
+
+Rules are plain reactive functions — dark mode from the system preference, a chat widget from time of day, developer access from a cookie. Still overridable by a URL param or `setFlag()`.
+
+```ts
+import { FeatureToggles } from 'vue-feature-toggles'
+
+app.use(FeatureToggles, {
+  rules: {
+    darkMode: () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+    liveChatWidget: () => {
+      const h = new Date().getHours()
+      return h >= 9 && h < 18
+    },
+    devFeatures: () => document.cookie.includes('internal=1'),
+  },
+})
+
+// Rules are reactive functions, re-evaluated whenever their inputs change —
+// still overridable by a URL param or setFlag() at runtime.
+```
+
+#### An A/B test without a single v-if
+
+`checkoutFlow` holds a string variant instead of a boolean — `<FeatureVariant>` renders the right slot on its own, and switching via `?feature:checkoutFlow=v2` works without a reload.
+
+```vue
+<script setup lang="ts">
+import { useFeatureVariant } from 'vue-feature-toggles'
+
+const variant = useFeatureVariant('checkoutFlow') // Ref<string>
+</script>
+
+<template>
+  <FeatureVariant name="checkoutFlow">
+    <template #v1><CheckoutV1 /></template>
+    <template #v2><CheckoutV2 /></template>
+    <template #fallback><CheckoutLegacy /></template>
+  </FeatureVariant>
+</template>
+
+<!-- URL overrides work identically: ?feature:checkoutFlow=v2 -->
+```
+
+#### Flags change on the fly — no reload, no polling
+
+The server pushes `{ betaSearch: true }` over SSE or WebSocket, and every component using that flag re-renders instantly — no polling required.
+
+```ts
+import { FeatureToggles } from 'vue-feature-toggles'
+
+app.use(FeatureToggles, {
+  loader: async () => fetch('/api/flags').then((r) => r.json()),
+  liveUpdates: { type: 'sse', url: '/api/flags/stream' },
+})
+
+// The server pushes { "betaSearch": true }, and every component using that
+// flag re-renders instantly — no polling, no page reload.
+```
+
 ---
 
 ## Documentation & links
