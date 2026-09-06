@@ -36,6 +36,17 @@ Lightweight, backend-agnostic feature flags plugin for Vue 3 — boolean and mul
 
 ---
 
+## When you'd reach for this
+
+A new feature's code is often ready before marketing, QA, or the product manager are ready to turn it on — a feature flag separates the moment of deployment from the moment a feature actually becomes visible to users.
+
+- **A new feature isn't turned on for everyone at once** — First 5% of users see it, then 25%, then everyone — if something goes wrong, rolling back is easier than cleaning up after a full release.
+- **Two versions of a feature need comparing, not just on or off** — Some users see the old checkout button, others see the new one, and conversion is compared based on actual usage, not on which version the team happens to prefer.
+- **QA needs to switch between test scenarios quickly** — One set of features is on to check a new onboarding flow, another is on to test regression against old behavior. Instead of clicking through a dozen toggles by hand, a whole set is saved and switched on with one click.
+- **A feature needs to be turned off right now, no redeploy** — Something breaks overnight with a recently shipped feature, and nobody with server access is around — the flag can be flipped off remotely, and it takes effect immediately, without rebuilding or redeploying anything.
+
+---
+
 ## Installation
 
 | Dependency          | Minimum version | Needed for                                                  |

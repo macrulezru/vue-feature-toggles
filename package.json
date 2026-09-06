@@ -1,6 +1,6 @@
 {
   "name": "vue-feature-toggles",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Backend-agnostic feature flags for Vue 3 — boolean and multivariate flags, contextual rules, URL overrides, SSR hydration, DevTools and CLI.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
