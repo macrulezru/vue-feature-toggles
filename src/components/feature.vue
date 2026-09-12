@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, computed, useSlots } from 'vue'
+import { inject, computed, useSlots, watchEffect } from 'vue'
 import type { Component } from 'vue'
 import { FEATURE_PROVIDER_KEY } from '../core/FeatureProvider'
 import type { FeatureProvider } from '../core/types'
@@ -14,6 +14,16 @@ const props = defineProps<{
 
 const slots = useSlots()
 const provider = inject<FeatureProvider>(FEATURE_PROVIDER_KEY)
+
+if (import.meta.env?.DEV === true) {
+  watchEffect(() => {
+    if (!props.name && !props.group) {
+      console.warn(
+        '[vue-feature-toggles] <Feature> received neither "name" nor "group" — it will always render nothing/fallback.',
+      )
+    }
+  })
+}
 
 const isLoading = computed(() => provider?.isLoading.value ?? false)
 

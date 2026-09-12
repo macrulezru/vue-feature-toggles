@@ -319,11 +319,18 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
   }
 
   // ── Loader / reload ────────────────────────────────────────────────────────
+  // Keys most recently set by a live push (SSE/WebSocket) rather than the
+  // async loader() call — tracked separately so getFlagSource() can report
+  // 'live' instead of conflating them with 'loader'. Cleared on every fresh
+  // reload() since that replaces loaderFlags wholesale with loader-sourced data.
+  const liveFlagKeys = ref<Set<string>>(new Set())
+
   const reload = async (): Promise<void> => {
     if (!loader) return
     isLoading.value = true
     try {
       loaderFlags.value = await loader()
+      liveFlagKeys.value = new Set()
       isReady.value = true
     } finally {
       isLoading.value = false
@@ -341,6 +348,9 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
   if (liveUpdates) {
     setupLiveUpdates(liveUpdates, (partial) => {
       loaderFlags.value = { ...loaderFlags.value, ...partial }
+      const next = new Set(liveFlagKeys.value)
+      for (const key of Object.keys(partial)) next.add(key)
+      liveFlagKeys.value = next
     })
   }
 
@@ -350,6 +360,7 @@ export function createFeatureProvider(options: FeatureTogglesOptions): FeaturePr
     if (name in runtimeOverrides.value) return 'runtime'
     if (name in ruleFlags.value)        return 'rules'
     if (name in schedule && !scheduleActiveMap.value[name]) return 'schedule'
+    if (liveFlagKeys.value.has(name))   return 'live'
     if (name in loaderFlags.value)      return 'loader'
     if (name in staticFlags)            return 'static'
     return 'default'
