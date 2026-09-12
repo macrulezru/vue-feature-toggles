@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { createFeatureProvider } from '../core/FeatureProvider'
 import { PERSIST_KEY } from '../core/persistence'
@@ -52,6 +52,62 @@ describe('flag priority chain', () => {
     const p = createFeatureProvider({ flags: { feat: false } })
     p.setFlag('feat', true)
     expect(p.getFlagSource('feat')).toBe('runtime')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Live updates source tracking
+// ---------------------------------------------------------------------------
+
+describe('live updates', () => {
+  it('getFlagSource reports "live" (not "loader") for a flag pushed via SSE', () => {
+    // Regression: FlagSource had no 'live' value at all — a live-pushed flag
+    // was indistinguishable from one that came back from the async loader().
+    let onmessage: ((e: { data: string }) => void) | undefined
+    class FakeEventSource {
+      constructor(_url: string) {}
+      set onmessage(fn: (e: { data: string }) => void) { onmessage = fn }
+      set onerror(_fn: () => void) {}
+      close() {}
+    }
+    vi.stubGlobal('EventSource', FakeEventSource)
+
+    const p = createFeatureProvider({
+      flags: { feat: false },
+      liveUpdates: { type: 'sse', url: '/stream' },
+    })
+
+    onmessage?.({ data: JSON.stringify({ feat: true }) })
+
+    expect(p.isEnabled('feat')).toBe(true)
+    expect(p.getFlagSource('feat')).toBe('live')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('reload() clears "live" source tracking, reverting to "loader"', async () => {
+    let onmessage: ((e: { data: string }) => void) | undefined
+    class FakeEventSource {
+      constructor(_url: string) {}
+      set onmessage(fn: (e: { data: string }) => void) { onmessage = fn }
+      set onerror(_fn: () => void) {}
+      close() {}
+    }
+    vi.stubGlobal('EventSource', FakeEventSource)
+
+    const p = createFeatureProvider({
+      loader: async () => ({ feat: false }),
+      liveUpdates: { type: 'sse', url: '/stream' },
+    })
+    await nextTick()
+
+    onmessage?.({ data: JSON.stringify({ feat: true }) })
+    expect(p.getFlagSource('feat')).toBe('live')
+
+    await p.reload()
+    expect(p.getFlagSource('feat')).toBe('loader')
+
+    vi.unstubAllGlobals()
   })
 })
 

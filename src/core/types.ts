@@ -28,7 +28,7 @@ export type FlagValue = boolean | string
  */
 export type FlagDefinition = FlagValue | { value: FlagValue; rollout: number }
 
-export type FlagSource = 'url' | 'runtime' | 'rules' | 'loader' | 'static' | 'schedule' | 'default'
+export type FlagSource = 'url' | 'runtime' | 'rules' | 'loader' | 'static' | 'schedule' | 'live' | 'default'
 
 export interface FlagMeta {
   description?: string
